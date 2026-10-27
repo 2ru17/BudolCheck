@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production & Build Outputs
+dist/
+dist-ssr/
+build/
+.vercel/
+.output/
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.jks
+*.keystore
+
+# Local SQLite / LibSQL Runtime Databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Caches & TypeScript Build Info
+.vite/
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+*.cpuprofile
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+
+# OS & Editor Metadata
+.DS_Store
+Thumbs.db
+*~
+.idea/
+.vscode/*
+!.vscode/extensions.json
