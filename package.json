@@ -1,0 +1,43 @@
+{
+  "name": "budolcheck",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Smart e-commerce verification and cross-marketplace price comparison web application.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/quicksand": "^5.3.0",
+    "@fontsource-variable/space-grotesk": "^5.3.0",
+    "@mantine/core": "^7.15.0",
+    "@mantine/hooks": "^7.15.0",
+    "@react-three/drei": "^9.120.4",
+    "@react-three/fiber": "^8.17.10",
+    "animejs": "^3.2.2",
+    "motion": "^11.15.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.170.0",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/animejs": "^3.1.12",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/three": "^0.170.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "postcss-preset-mantine": "^1.17.0",
+    "postcss-simple-vars": "^7.0.1",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5"
+  }
+}
