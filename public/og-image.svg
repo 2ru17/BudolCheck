@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#F7F3E8" />
+  <rect x="40" y="40" width="1120" height="550" rx="24" fill="#FFFFFF" stroke="#2C2623" stroke-width="4" />
+  
+  <!-- Logo Icon -->
+  <g transform="translate(100, 150) scale(4.5)">
+    <rect x="6" y="11" width="20" height="17" rx="3" fill="#FAD6B8" stroke="#2C2623" stroke-width="2" />
+    <path d="M11 11V9a5 5 0 0 1 10 0v2" fill="none" stroke="#2C2623" stroke-width="2" />
+  </g>
+
+  <!-- Typography -->
+  <text x="280" y="220" font-family="'Fraunces', Georgia, serif" font-size="76" font-weight="900" fill="#2C2623">Budol<tspan fill="#3E5634">Check</tspan></text>
+  <text x="285" y="275" font-family="'Inter', sans-serif" font-size="28" font-weight="600" fill="#789668" letter-spacing="1">CHECK FIRST. BUDOL LATER.</text>
+  <text x="285" y="340" font-family="'Inter', sans-serif" font-size="24" font-weight="400" fill="#5F574F">Smart Philippine E-Commerce Scam &amp; Specification Verification</text>
+
+  <!-- Badges -->
+  <g transform="translate(100, 440)">
+    <!-- Shopee Badge -->
+    <rect x="0" y="0" width="220" height="56" rx="14" fill="#FFEFE9" stroke="#EE4D2D" stroke-width="2" />
+    <text x="110" y="36" font-family="'Inter', sans-serif" font-size="20" font-weight="700" fill="#EE4D2D" text-anchor="middle">Shopee PH</text>
+    
+    <!-- Lazada Badge -->
+    <rect x="245" y="0" width="220" height="56" rx="14" fill="#EEF2FF" stroke="#0F146D" stroke-width="2" />
+    <text x="355" y="36" font-family="'Inter', sans-serif" font-size="20" font-weight="700" fill="#0F146D" text-anchor="middle">Lazada PH</text>
+
+    <!-- Temu Badge -->
+    <rect x="490" y="0" width="220" height="56" rx="14" fill="#FFF7ED" stroke="#FB7701" stroke-width="2" />
+    <text x="600" y="36" font-family="'Inter', sans-serif" font-size="20" font-weight="700" fill="#FB7701" text-anchor="middle">Temu Direct</text>
+
+    <!-- Domain -->
+    <text x="1000" y="38" font-family="'Inter', sans-serif" font-size="22" font-weight="700" fill="#2C2623" text-anchor="end">budol-check.vercel.app</text>
+  </g>
+</svg>

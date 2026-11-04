@@ -2,10 +2,10 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.ts"
+      "destination": "/api/index.js"
     },
     {
-      "source": "/((?!api/|assets/|_vercel/|robots\\.txt|sitemap\\.xml|logo\\.svg).*)",
+      "source": "/((?!api/|assets/|_vercel/|robots\\.txt|sitemap\\.xml|.*\\.(?:svg|png|ico|jpg|jpeg|webp)).*)",
       "destination": "/index.html"
     }
   ],

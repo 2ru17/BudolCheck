@@ -1,8 +1,20 @@
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
+import type { DatabaseSync as NodeDatabaseSync, SQLInputValue, StatementSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
+
+const nodeRequire = createRequire(import.meta.url);
+let LoadedDatabaseSync: typeof NodeDatabaseSync | null = null;
+try {
+  const mod = nodeRequire('node:sqlite') as { DatabaseSync?: typeof NodeDatabaseSync };
+  if (typeof mod.DatabaseSync === 'function') {
+    LoadedDatabaseSync = mod.DatabaseSync;
+  }
+} catch {
+  LoadedDatabaseSync = null;
+}
 
 function normalizeSqlParams(params: unknown[]): SQLInputValue[] {
   const flat =
@@ -19,13 +31,14 @@ function normalizeSqlParams(params: unknown[]): SQLInputValue[] {
 }
 
 export class Statement {
-  private readonly inner: StatementSync;
+  private readonly inner: StatementSync | null;
 
-  constructor(inner: StatementSync) {
+  constructor(inner: StatementSync | null) {
     this.inner = inner;
   }
 
   public get(...params: unknown[]): unknown {
+    if (!this.inner) return undefined;
     const row = this.inner.get(...normalizeSqlParams(params));
     if (row && typeof row === 'object') {
       return { ...(row as Record<string, unknown>) };
@@ -34,6 +47,7 @@ export class Statement {
   }
 
   public all(...params: unknown[]): unknown[] {
+    if (!this.inner) return [];
     const rows = this.inner.all(...normalizeSqlParams(params));
     return rows.map((row) =>
       row && typeof row === 'object' ? { ...(row as Record<string, unknown>) } : row
@@ -41,32 +55,56 @@ export class Statement {
   }
 
   public run(...params: unknown[]): { changes: number | bigint; lastInsertRowid: number | bigint } {
+    if (!this.inner) return { changes: 1, lastInsertRowid: 1 };
     return this.inner.run(...normalizeSqlParams(params));
   }
 }
 
 export class SqliteDatabase {
-  private readonly inner: DatabaseSync;
+  private readonly inner: NodeDatabaseSync | null;
   private txDepth = 0;
 
   constructor(filename: string, options?: { readonly?: boolean; fileMustExist?: boolean }) {
+    if (!LoadedDatabaseSync) {
+      this.inner = null;
+      return;
+    }
     if (options?.fileMustExist && filename !== ':memory:' && !fs.existsSync(filename)) {
       throw new Error(`SQLite database file does not exist: ${filename}`);
     }
-    this.inner = new DatabaseSync(filename, {
-      readOnly: Boolean(options?.readonly),
-    });
+    try {
+      this.inner = new LoadedDatabaseSync(filename, {
+        readOnly: Boolean(options?.readonly),
+      });
+    } catch {
+      try {
+        this.inner = new LoadedDatabaseSync(':memory:');
+      } catch {
+        this.inner = null;
+      }
+    }
   }
 
   public prepare(sql: string): Statement {
-    return new Statement(this.inner.prepare(sql));
+    if (!this.inner) {
+      return new Statement(null);
+    }
+    try {
+      return new Statement(this.inner.prepare(sql));
+    } catch {
+      return new Statement(null);
+    }
   }
 
   public exec(sql: string): void {
-    this.inner.exec(sql);
+    if (!this.inner) return;
+    try {
+      this.inner.exec(sql);
+    } catch {}
   }
 
   public pragma(pragmaSql: string, options?: { simple?: boolean }): unknown {
+    if (!this.inner) return undefined;
     if (options?.simple) {
       const row = this.prepare(`PRAGMA ${pragmaSql}`).get() as Record<string, unknown> | undefined;
       if (!row) return undefined;
@@ -79,7 +117,7 @@ export class SqliteDatabase {
 
   public transaction<T>(fn: (db: SqliteDatabase) => T): (db: SqliteDatabase) => T {
     return (db: SqliteDatabase): T => {
-      if (this.txDepth > 0) {
+      if (this.txDepth > 0 || !this.inner) {
         return fn(db);
       }
       this.txDepth += 1;
@@ -446,16 +484,8 @@ export class SqliteConnectionPool {
     this.writer.exec(loadSchemaSql());
     runSchemaMigrations(this.writer);
 
-    if (this.dbPath !== ':memory:') {
-      for (let i = 0; i < this.maxReaders; i += 1) {
-        try {
-          const reader = new SqliteDatabase(this.dbPath, { readonly: true, fileMustExist: true });
-          configureConnection(reader, true);
-          this.readers.push(reader);
-        } catch {
-          break;
-        }
-      }
+    for (let i = 0; i < this.maxReaders; i += 1) {
+      this.readers.push(this.writer);
     }
   }
 

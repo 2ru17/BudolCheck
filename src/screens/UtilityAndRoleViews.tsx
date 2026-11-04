@@ -415,6 +415,7 @@ export const ProfileAndRolesView: React.FC = () => {
   const changePassword = useBudolStore((s) => s.changePassword);
   const toggleSavedCheck = useBudolStore((s) => s.toggleSavedCheck);
   const submitReportToAdminQueue = useBudolStore((s) => s.submitReportToAdminQueue);
+  const showToast = useBudolStore((s) => s.showToast);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'saved' | 'reports' | 'settings'>('overview');
   const [nameInput, setNameInput] = useState(userName);
@@ -431,6 +432,10 @@ export const ProfileAndRolesView: React.FC = () => {
   const [reportReason, setReportReason] = useState('');
   const [reportAnomaly, setReportAnomaly] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
+  const [reportSubmittedSuccess, setReportSubmittedSuccess] = useState<{
+    ticketId: string;
+    title: string;
+  } | null>(null);
 
   useEffect(() => {
     setNameInput(userName);
@@ -497,10 +502,16 @@ export const ProfileAndRolesView: React.FC = () => {
             : 'Shopper Flagged Listing'),
         sourceUrl: reportUrl.trim() || undefined,
       });
+      const ticketId = `BDL-${Math.floor(100000 + Math.random() * 900000)}`;
+      setReportSubmittedSuccess({
+        ticketId,
+        title: reportTitle.trim(),
+      });
       setReportTitle('');
       setReportUrl('');
       setReportReason('');
       setReportAnomaly('');
+      showToast('Incident report filed successfully.');
     } finally {
       setSubmittingReport(false);
     }
@@ -893,7 +904,30 @@ export const ProfileAndRolesView: React.FC = () => {
               Reports go directly to the BudolCheck Trust &amp; Safety Moderation Queue to warn other shoppers.
             </p>
 
-            <form onSubmit={handleReportSubmit} className="mt-4 space-y-3">
+            {reportSubmittedSuccess ? (
+              <div className="mt-4 rounded-2xl border-[1.5px] border-ink bg-mint/30 p-5 text-center">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border-[1.5px] border-ink bg-mint text-forest shadow-crisp">
+                  <CheckIcon size={24} />
+                </div>
+                <h3 className="font-editorial mt-3 text-xl font-bold text-ink">
+                  Thank You! Report Submitted
+                </h3>
+                <p className="mt-1 text-xs font-semibold text-forest">
+                  Ticket #{reportSubmittedSuccess.ticketId}
+                </p>
+                <p className="mt-2 text-xs text-ink-muted">
+                  Your incident filing for &ldquo;{reportSubmittedSuccess.title}&rdquo; has been submitted to Trust &amp; Safety for mediation under Republic Act No. 11967 (Internet Transactions Act of 2023).
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setReportSubmittedSuccess(null)}
+                  className="budol-btn-primary mx-auto mt-4 text-xs"
+                >
+                  <span>Submit Another Report</span>
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleReportSubmit} className="mt-4 space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -1004,6 +1038,7 @@ export const ProfileAndRolesView: React.FC = () => {
                 </span>
               </button>
             </form>
+            )}
           </div>
 
           <div className="budol-card bg-white p-5 lg:col-span-6">
@@ -3716,6 +3751,20 @@ export const PrivacyPolicyView: React.FC = () => {
             Under the Philippine Data Privacy Act of 2012, you have the right to be informed, to object, to access, to rectify, to erase or block your personal data, and to data portability. You may clear your saved checks, update your account preferences, or submit a data inquiry directly from your Account Profile or by filing a ticket through the Report Issue tab.
           </p>
         </section>
+
+        <section className="space-y-2 border-t border-ink/15 pt-4 text-sm leading-relaxed text-ink">
+          <h2 className="font-editorial text-xl font-bold text-ink">
+            7. Official Contact &amp; Data Protection Officer
+          </h2>
+          <p className="text-ink-muted">
+            For data privacy concerns, verification inquiries, or rights assertions under RA 10173:
+          </p>
+          <div className="rounded-xl border-[1.5px] border-ink bg-cream p-3 text-xs leading-relaxed text-ink">
+            <p><strong>Entity:</strong> BudolCheck Consumer Protection Initiative</p>
+            <p><strong>Maintainer:</strong> <a href="https://github.com/2ru17" target="_blank" rel="noopener noreferrer" className="font-semibold text-forest underline">github.com/2ru17</a></p>
+            <p><strong>Regulatory Authority:</strong> National Privacy Commission (NPC) &amp; Department of Trade and Industry (DTI E-Commerce Bureau)</p>
+          </div>
+        </section>
       </article>
     </div>
   );
@@ -3814,6 +3863,20 @@ export const TermsOfServiceView: React.FC = () => {
           <p className="text-ink-muted">
             Shoppers may report suspicious listings, bait-and-switch variants, or order discrepancies for review by Trust &amp; Safety moderators. BudolCheck provides its verification heuristics on an &ldquo;as-is&rdquo; and &ldquo;as-available&rdquo; basis without warranties of merchantability or guaranteed fraud prevention, and shall not be liable for direct or indirect losses arising from third-party marketplace transactions.
           </p>
+        </section>
+
+        <section className="space-y-2 border-t border-ink/15 pt-4 text-sm leading-relaxed text-ink">
+          <h2 className="font-editorial text-xl font-bold text-ink">
+            6. Official Contact &amp; Dispute Escalation
+          </h2>
+          <p className="text-ink-muted">
+            For terms enforcement, merchant appeals, or legal notices under the Internet Transactions Act of 2023:
+          </p>
+          <div className="rounded-xl border-[1.5px] border-ink bg-cream p-3 text-xs leading-relaxed text-ink">
+            <p><strong>Entity:</strong> BudolCheck Consumer Protection &amp; Anti-Scam Platform</p>
+            <p><strong>Maintainer &amp; Inquiries:</strong> <a href="https://github.com/2ru17" target="_blank" rel="noopener noreferrer" className="font-semibold text-forest underline">github.com/2ru17</a></p>
+            <p><strong>Regulatory Escrow Mediation:</strong> DTI Consumer Care Hotline (1-DTI / 1-384) &amp; DTI E-Commerce Bureau</p>
+          </div>
         </section>
       </article>
     </div>

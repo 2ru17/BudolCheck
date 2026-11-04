@@ -433,6 +433,15 @@ export const NavigationShell: React.FC<NavigationShellProps> = ({ children }) =>
             >
               Terms of Service
             </button>
+            <span aria-hidden="true">&bull;</span>
+            <a
+              href="https://github.com/2ru17"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-ink hover:text-forest hover:underline"
+            >
+              GitHub (@2ru17)
+            </a>
           </div>
         </div>
       </footer>

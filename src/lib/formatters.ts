@@ -101,10 +101,10 @@ export function isDirectMarketplaceProductUrl(rawUrl: string | undefined | null)
     const host = parsed.hostname.toLowerCase();
     const path = parsed.pathname;
 
-    if (host.includes('lazada.')) {
+    if (host.endsWith('lazada.com.ph')) {
       return /\/products\/[^/?#]+-i\d+(?:-s\d+)?\.html/i.test(path);
     }
-    if (host.includes('shopee.')) {
+    if (host.endsWith('shopee.ph')) {
       return (
         /-i\.\d+\.\d+/i.test(path) ||
         /\/product\/\d+\/\d+/i.test(path) ||

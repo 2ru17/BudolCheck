@@ -18,7 +18,8 @@ export type ScreenId =
   | 'seller-dash'
   | 'admin-dash'
   | 'privacy'
-  | 'terms';
+  | 'terms'
+  | '404';
 
 export type ProductSubTab = 'overview' | 'reviews' | 'similar';
 

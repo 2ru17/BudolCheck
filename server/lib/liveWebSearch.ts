@@ -787,7 +787,7 @@ const VERIFIED_BRAND_STORES: Array<{
   { pattern: /\b(asus|tuf|rog|zephyrus|vivobook|zenbook)\b/i, brandName: 'ASUS', lazadaStore: 'ASUS Official Store LazMall', shopeeStore: 'ASUS Official Store PH' },
   { pattern: /\b(lenovo|legion|loq|thinkpad|ideapad|thinkplus)\b/i, brandName: 'Lenovo', lazadaStore: 'Lenovo Official Store LazMall', shopeeStore: 'Lenovo Official Store PH' },
   { pattern: /\b(acer|nitro|predator|aspire|swift)\b/i, brandName: 'Acer', lazadaStore: 'Acer Official Store LazMall', shopeeStore: 'Acer Official Store PH' },
-  { pattern: /\b(msi|katana|cyborg|stealth|claw)\b/i, brandName: 'MSI', lazadaStore: 'MSI Official Store LazMall', shopeeStore: 'MSI Official Store PH' },
+  { pattern: /\b(msi|msi\s+katana|msi\s+cyborg|msi\s+stealth|msi\s+claw)\b/i, brandName: 'MSI', lazadaStore: 'MSI Official Store LazMall', shopeeStore: 'MSI Official Store PH' },
   { pattern: /\b(hp|victus|omen|pavilion)\b/i, brandName: 'HP', lazadaStore: 'HP Official Store LazMall', shopeeStore: 'HP Official Store PH' },
   { pattern: /\b(apple|macbook|iphone|ipad|airpods)\b/i, brandName: 'Apple', lazadaStore: 'Apple Flagship Store LazMall', shopeeStore: 'Apple Flagship Store' },
   { pattern: /\b(samsung|galaxy)\b/i, brandName: 'Samsung', lazadaStore: 'Samsung Official Store LazMall', shopeeStore: 'Samsung Official Store PH' },
@@ -1261,7 +1261,16 @@ export async function discoverLiveWebMarketplaceListings(
     if (!normTitleKey || seenTitleKeys.has(normTitleKey)) continue;
     seenTitleKeys.add(normTitleKey);
 
+    const urlLower = cand.url.toLowerCase();
+    const urlPlatform: 'Shopee' | 'Lazada' | 'Temu' | undefined = urlLower.includes('shopee.ph')
+      ? 'Shopee'
+      : urlLower.includes('lazada.com.ph')
+      ? 'Lazada'
+      : urlLower.includes('temu.com')
+      ? 'Temu'
+      : undefined;
     const platformName =
+      urlPlatform ||
       cand.platformHint ||
       inferPlatformFromUrlOrText(cand.url, `${cand.title} ${cand.snippet}`, deduplicated.length);
     const { brandName, sellerName, isMallVerified, sellerLocation } = inferSellerAndBrand(

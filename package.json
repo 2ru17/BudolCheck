@@ -4,11 +4,15 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Smart e-commerce verification and cross-marketplace price comparison web application.",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "vite",
     "dev:api": "tsx watch server/index.ts",
     "start": "tsx server/index.ts",
-    "build": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit && vite build",
+    "build:api": "esbuild server/app.ts --bundle --packages=external --platform=node --target=node22 --format=esm --outfile=api/index.js",
+    "build": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit && npm run build:api && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json --noEmit"
   },

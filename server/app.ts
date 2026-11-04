@@ -66,9 +66,27 @@ import {
   upsertProductCheckRecord,
 } from './repositories/checkRepository.ts';
 
-ensureDatabaseSeeded();
+let dbSeededOnce = false;
+function safeEnsureSeeded(): void {
+  if (dbSeededOnce) return;
+  try {
+    ensureDatabaseSeeded();
+    dbSeededOnce = true;
+  } catch (err) {
+    console.error('[BudolCheck] Database seed warning:', err);
+  }
+}
+
+safeEnsureSeeded();
 
 export const app = express();
+
+app.use((_req: Request, _res: Response, next: NextFunction) => {
+  if (!dbSeededOnce) {
+    safeEnsureSeeded();
+  }
+  next();
+});
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
