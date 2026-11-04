@@ -1,4 +1,4 @@
-import type { Database as SqliteDatabase } from 'better-sqlite3';
+import type { SqliteDatabase } from '../db/pool.ts';
 import {
   ADMIN_ACTIVITIES_PRESETS,
   ADMIN_USERS_PRESETS,

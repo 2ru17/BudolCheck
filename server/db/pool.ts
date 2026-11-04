@@ -1,8 +1,104 @@
-import Database, { Database as SqliteDatabase, Statement } from 'better-sqlite3';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
+
+function normalizeSqlParams(params: unknown[]): SQLInputValue[] {
+  const flat =
+    params.length === 1 && Array.isArray(params[0]) ? (params[0] as unknown[]) : params;
+  return flat.map((val): SQLInputValue => {
+    if (val === undefined || val === null) return null;
+    if (typeof val === 'boolean') return val ? 1 : 0;
+    if (typeof val === 'number' || typeof val === 'string' || typeof val === 'bigint') {
+      return val;
+    }
+    if (val instanceof Uint8Array) return val;
+    return JSON.stringify(val);
+  });
+}
+
+export class Statement {
+  private readonly inner: StatementSync;
+
+  constructor(inner: StatementSync) {
+    this.inner = inner;
+  }
+
+  public get(...params: unknown[]): unknown {
+    const row = this.inner.get(...normalizeSqlParams(params));
+    if (row && typeof row === 'object') {
+      return { ...(row as Record<string, unknown>) };
+    }
+    return row;
+  }
+
+  public all(...params: unknown[]): unknown[] {
+    const rows = this.inner.all(...normalizeSqlParams(params));
+    return rows.map((row) =>
+      row && typeof row === 'object' ? { ...(row as Record<string, unknown>) } : row
+    );
+  }
+
+  public run(...params: unknown[]): { changes: number | bigint; lastInsertRowid: number | bigint } {
+    return this.inner.run(...normalizeSqlParams(params));
+  }
+}
+
+export class SqliteDatabase {
+  private readonly inner: DatabaseSync;
+  private txDepth = 0;
+
+  constructor(filename: string, options?: { readonly?: boolean; fileMustExist?: boolean }) {
+    if (options?.fileMustExist && filename !== ':memory:' && !fs.existsSync(filename)) {
+      throw new Error(`SQLite database file does not exist: ${filename}`);
+    }
+    this.inner = new DatabaseSync(filename, {
+      readOnly: Boolean(options?.readonly),
+    });
+  }
+
+  public prepare(sql: string): Statement {
+    return new Statement(this.inner.prepare(sql));
+  }
+
+  public exec(sql: string): void {
+    this.inner.exec(sql);
+  }
+
+  public pragma(pragmaSql: string, options?: { simple?: boolean }): unknown {
+    if (options?.simple) {
+      const row = this.prepare(`PRAGMA ${pragmaSql}`).get() as Record<string, unknown> | undefined;
+      if (!row) return undefined;
+      const values = Object.values(row);
+      return values.length > 0 ? values[0] : undefined;
+    }
+    this.exec(`PRAGMA ${pragmaSql}`);
+    return undefined;
+  }
+
+  public transaction<T>(fn: (db: SqliteDatabase) => T): (db: SqliteDatabase) => T {
+    return (db: SqliteDatabase): T => {
+      if (this.txDepth > 0) {
+        return fn(db);
+      }
+      this.txDepth += 1;
+      this.exec('BEGIN IMMEDIATE');
+      try {
+        const result = fn(db);
+        this.exec('COMMIT');
+        return result;
+      } catch (err) {
+        try {
+          this.exec('ROLLBACK');
+        } catch {}
+        throw err;
+      } finally {
+        this.txDepth -= 1;
+      }
+    };
+  }
+}
 
 const INLINE_SCHEMA_FALLBACK = `
 CREATE TABLE IF NOT EXISTS users (
@@ -338,10 +434,10 @@ export class SqliteConnectionPool {
     let writerConn: SqliteDatabase;
 
     try {
-      writerConn = new Database(resolved);
+      writerConn = new SqliteDatabase(resolved);
     } catch {
       resolved = ':memory:';
-      writerConn = new Database(':memory:');
+      writerConn = new SqliteDatabase(':memory:');
     }
 
     this.dbPath = resolved;
@@ -353,7 +449,7 @@ export class SqliteConnectionPool {
     if (this.dbPath !== ':memory:') {
       for (let i = 0; i < this.maxReaders; i += 1) {
         try {
-          const reader = new Database(this.dbPath, { readonly: true, fileMustExist: true });
+          const reader = new SqliteDatabase(this.dbPath, { readonly: true, fileMustExist: true });
           configureConnection(reader, true);
           this.readers.push(reader);
         } catch {
