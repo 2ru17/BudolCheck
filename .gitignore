@@ -25,6 +25,7 @@ build/
 *.keystore
 
 # Local SQLite / LibSQL Runtime Databases
+.data/
 *.db
 *.db-shm
 *.db-wal

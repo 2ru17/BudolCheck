@@ -1,7 +1,7 @@
 import { DEMO_LISTINGS } from '../data/demoListings.ts';
 import { PlatformComparisonItem, ProductCheckRecord } from '../types/budol.ts';
 
-export type ListingPlatform = 'Shopee' | 'Lazada' | 'TikTok Shop' | 'Temu';
+export type ListingPlatform = 'Shopee' | 'Lazada' | 'Temu';
 
 export interface NormalizedListing {
   sourceUrl: string;
@@ -35,7 +35,6 @@ const PLATFORM_HOSTS: Array<{ match: string; platform: ListingPlatform }> = [
   { match: 'shopee.', platform: 'Shopee' },
   { match: 'lazada.', platform: 'Lazada' },
   { match: 'temu.', platform: 'Temu' },
-  { match: 'shop.tiktok.com', platform: 'TikTok Shop' },
 ];
 
 export function platformFromUrl(url: URL): ListingPlatform | null {
@@ -79,8 +78,6 @@ export function canonicalListingKey(rawUrl: string): string {
   if (host.includes('shopee.') && shopee) return `shopee:${shopee[1]}.${shopee[2]}`;
   const lazada = path.match(/-i(\d+)(?:-s\d+)?\.html/);
   if (host.includes('lazada.') && lazada) return `lazada:${lazada[1]}`;
-  const tiktok = path.match(/\/product\/(\d+)/);
-  if (host.includes('tiktok.com') && tiktok) return `tiktok:${tiktok[1]}`;
   const temu = path.match(/-g-(\d+)/);
   if (host.includes('temu.') && temu) return `temu:${temu[1]}`;
   return `${host}${path.replace(/\/+$/, '')}`.toLowerCase();

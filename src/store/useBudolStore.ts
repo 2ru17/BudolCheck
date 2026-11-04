@@ -6,12 +6,37 @@ import {
 } from '../data/presets.ts';
 import {
   analyzeProductInput,
+  changeAccountPassword,
+  connectShopAccount,
+  ConnectShopInput,
+  createAdminQueueItemOnServer,
+  createCheckFromCatalogId,
+  fetchAdminQueue,
+  fetchAllChecks,
   fetchCheckById,
+  fetchCurrentSession,
   fetchPaginatedReviews,
+  fetchSavedChecksState,
+  fetchTipsAndGuides,
+  invalidateClientCache,
+  loginWithGoogleToken,
+  loginWithPassword,
+  logoutAccount,
+  patchAdminQueueStatus,
+  patchUserProfileOnServer,
+  registerAccount,
+  requestPasswordResetCode,
+  resetPasswordWithCode,
+  searchMarketplaceListings,
+  toggleSavedCheckOnServer,
 } from '../lib/apiClient.ts';
 import { detectLink, INVALID_LINK_MESSAGE } from '../lib/linkDetect.ts';
 import {
   AdminQueueItem,
+  AdminReportStatus,
+  AuthUser,
+  IllustrationKey,
+  MarketplaceSearchResponse,
   PaginatedReviewsResponse,
   ProductCheckRecord,
   ProductSubTab,
@@ -21,9 +46,18 @@ import {
   UserRole,
 } from '../types/budol.ts';
 
+export type SearchPlatformFilter = 'all' | 'Shopee' | 'Lazada' | 'Temu';
+export type SellerPortalTabId = 'home' | 'products' | 'feedback' | 'guidelines' | 'profile';
+export type AdminConsoleTabId = 'home' | 'users' | 'reports' | 'settings';
+
 interface BudolState {
   currentScreen: ScreenId;
   currentSubTab: ProductSubTab;
+  sellerPortalTab: SellerPortalTabId;
+  adminConsoleTab: AdminConsoleTabId;
+  isAuthenticated: boolean;
+  authUser: AuthUser | null;
+  authLoading: boolean;
   role: UserRole;
   userName: string;
   userEmail: string;
@@ -31,6 +65,10 @@ interface BudolState {
   activeCheckId: string;
   activeCheck: ProductCheckRecord;
   isLoadingCheck: boolean;
+  searchResults: MarketplaceSearchResponse | null;
+  searchQuery: string;
+  searchPlatformFilter: SearchPlatformFilter;
+  isSearchingCatalog: boolean;
   reviewsFilter: ReviewFilterType;
   reviewsPage: number;
   paginatedReviews: PaginatedReviewsResponse;
@@ -43,19 +81,59 @@ interface BudolState {
   tipsList: TipGuideItem[];
   adminQueue: AdminQueueItem[];
   toastMessage: string | null;
+  hasHydratedBackend: boolean;
 
+  hydrateFromBackend: () => Promise<void>;
   navigateTo: (screen: ScreenId, subTab?: ProductSubTab) => void;
   setSubTab: (subTab: ProductSubTab) => void;
-  setRole: (role: UserRole, navigateToRoleHome?: boolean) => void;
-  updateUserProfile: (name: string, email: string, shop?: string) => void;
+  setSellerPortalTab: (tab: SellerPortalTabId) => void;
+  setAdminConsoleTab: (tab: AdminConsoleTabId) => void;
+  submitReportToAdminQueue: (input: {
+    productTitle: string;
+    subtitle?: string;
+    platform: 'Shopee' | 'Lazada' | 'Temu';
+    flagReason: string;
+    reportCategory?: 'report' | 'complaint';
+    priceAnomaly?: string;
+    illustrationKey?: IllustrationKey;
+    thumbnailUrl?: string;
+    sourceUrl?: string;
+  }) => Promise<AdminQueueItem>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (params: {
+    fullName: string;
+    email: string;
+    password: string;
+    role?: 'user' | 'seller';
+  }) => Promise<void>;
+  connectShop: (input: 'Shopee' | 'Lazada' | 'Temu' | ConnectShopInput) => Promise<void>;
+  loginWithGoogle: (credential: string, role?: 'user' | 'seller') => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<{
+    sent: boolean;
+    message: string;
+    expiresInMinutes: number;
+    resetCodePreview?: string;
+  }>;
+  resetPassword: (params: {
+    email: string;
+    code: string;
+    newPassword: string;
+  }) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  logout: () => Promise<void>;
+  updateUserProfile: (name: string, email: string, shop?: string) => Promise<void>;
   loadProductCheck: (checkId: string) => Promise<void>;
+  runKeywordSearch: (query: string, platform?: SearchPlatformFilter) => Promise<void>;
+  setSearchPlatformFilter: (platform: SearchPlatformFilter) => Promise<void>;
+  clearSearchResults: () => void;
+  selectCatalogListingForCheck: (catalogId: string) => Promise<void>;
   runLinkAnalysis: (rawInput: string) => Promise<boolean>;
   runImageAnalysis: (dataUrl: string, fileName: string) => Promise<void>;
   clearListing: () => void;
   dismissLinkError: () => void;
   setReviewsQuery: (filter: ReviewFilterType, page: number) => Promise<void>;
   toggleSavedCheck: (checkId?: string) => void;
-  updateAdminQueueStatus: (itemId: string, status: 'flagged' | 'dismissed') => void;
+  updateAdminQueueStatus: (itemId: string, status: AdminReportStatus) => void;
   showToast: (message: string) => void;
   clearToast: () => void;
 }
@@ -83,6 +161,8 @@ function getInitialScreenFromUrl(): { screen: ScreenId; tab: ProductSubTab } {
     'profile',
     'seller-dash',
     'admin-dash',
+    'privacy',
+    'terms',
   ];
   const validTabs: ProductSubTab[] = ['overview', 'reviews', 'similar'];
 
@@ -104,21 +184,28 @@ function syncUrlParams(screen: ScreenId, tab: ProductSubTab) {
   window.history.replaceState({}, '', url.toString());
 }
 
-const HOUR_MS = 3_600_000;
-
 const initialRoute = getInitialScreenFromUrl();
 const defaultCheck = SHOWCASE_CHECKS[0];
 
 export const useBudolStore = create<BudolState>((set, get) => ({
   currentScreen: initialRoute.screen,
   currentSubTab: initialRoute.tab,
+  sellerPortalTab: 'home',
+  adminConsoleTab: 'home',
+  isAuthenticated: false,
+  authUser: null,
+  authLoading: false,
   role: 'user',
-  userName: 'Daisy',
-  userEmail: 'daisy@budolcheck.ph',
-  connectedShop: 'TikTok Shop & Shopee Connected',
+  userName: 'Guest',
+  userEmail: '',
+  connectedShop: 'Guest Session',
   activeCheckId: defaultCheck.id,
   activeCheck: defaultCheck,
   isLoadingCheck: false,
+  searchResults: null,
+  searchQuery: '',
+  searchPlatformFilter: 'all',
+  isSearchingCatalog: false,
   reviewsFilter: 'all',
   reviewsPage: 1,
   paginatedReviews: {
@@ -129,17 +216,71 @@ export const useBudolStore = create<BudolState>((set, get) => ({
     totalPages: Math.ceil(defaultCheck.reviews.length / 2),
   },
   isLoadingReviews: false,
-  savedCheckIds: ['chk_cupmat_001', 'chk_serum_003'],
-  savedAt: {
-    chk_cupmat_001: Date.now() - 5 * HOUR_MS,
-    chk_serum_003: Date.now() - 30 * HOUR_MS,
-  },
+  savedCheckIds: [],
+  savedAt: {},
   hasListing: true,
   linkError: null,
   historyChecks: SHOWCASE_CHECKS,
   tipsList: TIPS_AND_GUIDES_PRESETS,
   adminQueue: ADMIN_QUEUE_PRESETS,
   toastMessage: null,
+  hasHydratedBackend: false,
+
+  hydrateFromBackend: async () => {
+    if (get().hasHydratedBackend) return;
+    set({ hasHydratedBackend: true });
+
+    const [session, checks, tips, queue, savedState] = await Promise.all([
+      fetchCurrentSession(),
+      fetchAllChecks(),
+      fetchTipsAndGuides(),
+      fetchAdminQueue(),
+      fetchSavedChecksState(),
+    ]);
+
+    set((state) => {
+      const localUploads = state.historyChecks.filter((c) => c.uploadedImageUrl);
+      const validChecks = checks.filter(
+        (c) => (c.platformName as string) !== 'TikTok Shop' && c.id !== 'chk_cupmat_001'
+      );
+      const mergedHistory = [
+        ...localUploads,
+        ...validChecks.filter((c) => !localUploads.some((u) => u.id === c.id)),
+      ];
+      const candidateActive =
+        mergedHistory.find((c) => c.id === state.activeCheckId) ||
+        mergedHistory[0] ||
+        state.activeCheck;
+      const refreshedActive =
+        (candidateActive.platformName as string) === 'TikTok Shop' ||
+        candidateActive.id === 'chk_cupmat_001'
+          ? SHOWCASE_CHECKS[0]
+          : candidateActive;
+
+      const user = session.authenticated && session.user ? session.user : null;
+
+      return {
+        isAuthenticated: Boolean(user),
+        authUser: user,
+        role: user ? user.role : 'user',
+        userName: user ? user.fullName : 'Guest',
+        userEmail: user ? user.email : '',
+        connectedShop: user ? user.connectedShop : 'Guest Session',
+        historyChecks: mergedHistory.length > 0 ? mergedHistory : SHOWCASE_CHECKS,
+        activeCheckId: refreshedActive.id,
+        activeCheck: refreshedActive,
+        tipsList: tips.length > 0 ? tips : state.tipsList,
+        adminQueue:
+          queue.length > 0
+            ? queue.filter((q) => (q.platform as string) !== 'TikTok Shop')
+            : state.adminQueue,
+        savedCheckIds: savedState
+          ? savedState.savedCheckIds.filter((id) => id !== 'chk_cupmat_001')
+          : state.savedCheckIds,
+        savedAt: savedState ? savedState.savedAt : state.savedAt,
+      };
+    });
+  },
 
   navigateTo: (screen, subTab) => {
     const nextTab = subTab || get().currentSubTab;
@@ -156,25 +297,301 @@ export const useBudolStore = create<BudolState>((set, get) => ({
     set({ currentSubTab: subTab });
   },
 
-  setRole: (role, navigateToRoleHome = true) => {
-    set({ role });
-    if (navigateToRoleHome) {
-      if (role === 'seller') {
+  setSellerPortalTab: (tab) => {
+    set({ sellerPortalTab: tab, currentScreen: 'seller-dash' });
+    syncUrlParams('seller-dash', get().currentSubTab);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  },
+
+  setAdminConsoleTab: (tab) => {
+    set({ adminConsoleTab: tab, currentScreen: 'admin-dash' });
+    syncUrlParams('admin-dash', get().currentSubTab);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  },
+
+  submitReportToAdminQueue: async (input) => {
+    const created = await createAdminQueueItemOnServer(input);
+    const fallbackItem: AdminQueueItem = created ?? {
+      id: `adm_${Date.now().toString(36)}`,
+      productTitle: input.productTitle.trim(),
+      subtitle: input.subtitle?.trim() || input.flagReason.trim(),
+      platform: input.platform,
+      flagReason: input.flagReason.trim(),
+      reportsCount: 1,
+      priceAnomaly:
+        input.priceAnomaly?.trim() ||
+        (input.reportCategory === 'complaint'
+          ? 'Order / Fulfillment Issue'
+          : 'Community Flagged'),
+      reportedDate: 'Reported Just Now',
+      reportCategory: input.reportCategory ?? 'report',
+      thumbnailUrl: input.thumbnailUrl,
+      illustrationKey: input.illustrationKey ?? 'bag',
+      sourceUrl: input.sourceUrl?.trim() || undefined,
+      status: input.reportCategory === 'complaint' ? 'pending' : 'under_review',
+    };
+
+    set((state) => ({
+      adminQueue: [fallbackItem, ...state.adminQueue],
+    }));
+
+    get().showToast(
+      input.reportCategory === 'complaint'
+        ? 'Submitted buyer complaint to Trust & Safety Queue'
+        : 'Submitted listing report to Trust & Safety Queue'
+    );
+    return fallbackItem;
+  },
+
+  login: async (email, password) => {
+    set({ authLoading: true });
+    try {
+      const session = await loginWithPassword(email, password);
+      if (!session.user) {
+        throw new Error('Unable to load user profile.');
+      }
+      invalidateClientCache('/api/seller');
+      invalidateClientCache('/api/admin');
+      const savedState = await fetchSavedChecksState();
+      const user = session.user;
+      set((state) => ({
+        authLoading: false,
+        isAuthenticated: true,
+        authUser: user,
+        role: user.role,
+        userName: user.fullName,
+        userEmail: user.email,
+        connectedShop: user.connectedShop,
+        savedCheckIds: savedState ? savedState.savedCheckIds : state.savedCheckIds,
+        savedAt: savedState ? savedState.savedAt : state.savedAt,
+      }));
+      if (user.role === 'seller') {
         get().navigateTo('seller-dash');
-      } else if (role === 'admin') {
+      } else if (user.role === 'admin') {
         get().navigateTo('admin-dash');
       } else {
         get().navigateTo('home');
       }
+      get().showToast(`Signed in as ${user.fullName}`);
+    } catch (err) {
+      set({ authLoading: false });
+      throw err;
     }
-    get().showToast(`Active perspective switched to ${role.toUpperCase()}`);
   },
 
+  register: async (params) => {
+    set({ authLoading: true });
+    try {
+      const session = await registerAccount(params);
+      if (!session.user) {
+        throw new Error('Unable to create account.');
+      }
+      invalidateClientCache('/api/seller');
+      invalidateClientCache('/api/admin');
+      const savedState = await fetchSavedChecksState();
+      const user = session.user;
+      set({
+        authLoading: false,
+        isAuthenticated: true,
+        authUser: user,
+        role: user.role,
+        userName: user.fullName,
+        userEmail: user.email,
+        connectedShop: user.connectedShop,
+        savedCheckIds: savedState ? savedState.savedCheckIds : [],
+        savedAt: savedState ? savedState.savedAt : {},
+      });
+      if (user.role === 'seller') {
+        get().navigateTo('seller-dash');
+      } else {
+        get().navigateTo('home');
+      }
+      get().showToast(`Account created for ${user.fullName}`);
+    } catch (err) {
+      set({ authLoading: false });
+      throw err;
+    }
+  },
 
-  updateUserProfile: (name, email, shop) => {
+  connectShop: async (input) => {
+    set({ authLoading: true });
+    try {
+      const platform = typeof input === 'string' ? input : input.platform;
+      const wasAuthenticated = get().isAuthenticated;
+      const session = await connectShopAccount(input);
+      if (!session.user) {
+        throw new Error('Unable to connect marketplace account.');
+      }
+      const savedState = await fetchSavedChecksState();
+      const user = session.user;
+      set((state) => ({
+        authLoading: false,
+        isAuthenticated: true,
+        authUser: user,
+        role: user.role,
+        userName: user.fullName,
+        userEmail: user.email,
+        connectedShop: user.connectedShop,
+        savedCheckIds: savedState ? savedState.savedCheckIds : state.savedCheckIds,
+        savedAt: savedState ? savedState.savedAt : state.savedAt,
+      }));
+      if (!wasAuthenticated) {
+        if (user.role === 'seller') {
+          get().navigateTo('seller-dash');
+        } else {
+          get().navigateTo('home');
+        }
+      }
+      get().showToast(`Connected ${platform} Shop Account for ${user.fullName}`);
+    } catch (err) {
+      set({ authLoading: false });
+      throw err;
+    }
+  },
+
+  loginWithGoogle: async (credential, role = 'user') => {
+    set({ authLoading: true });
+    try {
+      const session = await loginWithGoogleToken(credential, role);
+      if (!session.user) {
+        throw new Error('Unable to sign in with Google right now.');
+      }
+      const savedState = await fetchSavedChecksState();
+      const user = session.user;
+      set((state) => ({
+        authLoading: false,
+        isAuthenticated: true,
+        authUser: user,
+        role: user.role,
+        userName: user.fullName,
+        userEmail: user.email,
+        connectedShop: user.connectedShop,
+        savedCheckIds: savedState ? savedState.savedCheckIds : state.savedCheckIds,
+        savedAt: savedState ? savedState.savedAt : state.savedAt,
+      }));
+      if (user.role === 'seller') {
+        get().navigateTo('seller-dash');
+      } else if (user.role === 'admin') {
+        get().navigateTo('admin-dash');
+      } else {
+        get().navigateTo('home');
+      }
+      get().showToast(`Signed in with Google as ${user.fullName}`);
+    } catch (err) {
+      set({ authLoading: false });
+      throw err;
+    }
+  },
+
+  requestPasswordReset: async (email) => {
+    set({ authLoading: true });
+    try {
+      const result = await requestPasswordResetCode(email);
+      set({ authLoading: false });
+      return result;
+    } catch (err) {
+      set({ authLoading: false });
+      throw err;
+    }
+  },
+
+  resetPassword: async (params) => {
+    set({ authLoading: true });
+    try {
+      const session = await resetPasswordWithCode(params);
+      if (!session.user) {
+        throw new Error('Unable to reset password.');
+      }
+      const savedState = await fetchSavedChecksState();
+      const user = session.user;
+      set((state) => ({
+        authLoading: false,
+        isAuthenticated: true,
+        authUser: user,
+        role: user.role,
+        userName: user.fullName,
+        userEmail: user.email,
+        connectedShop: user.connectedShop,
+        savedCheckIds: savedState ? savedState.savedCheckIds : state.savedCheckIds,
+        savedAt: savedState ? savedState.savedAt : state.savedAt,
+      }));
+      get().navigateTo('home');
+      get().showToast('Password updated and signed in');
+    } catch (err) {
+      set({ authLoading: false });
+      throw err;
+    }
+  },
+
+  changePassword: async (currentPassword, newPassword) => {
+    set({ authLoading: true });
+    try {
+      const res = await changeAccountPassword({ currentPassword, newPassword });
+      set({ authLoading: false });
+      get().showToast(res.message);
+    } catch (err) {
+      set({ authLoading: false });
+      throw err;
+    }
+  },
+
+  logout: async () => {
+    set({ authLoading: true });
+    await logoutAccount();
+    invalidateClientCache('/api/seller');
+    invalidateClientCache('/api/admin');
+    const currentScreen = get().currentScreen;
+    set({
+      authLoading: false,
+      isAuthenticated: false,
+      authUser: null,
+      role: 'user',
+      userName: 'Guest',
+      userEmail: '',
+      connectedShop: 'Guest Session',
+      savedCheckIds: [],
+      savedAt: {},
+    });
+    if (currentScreen === 'seller-dash' || currentScreen === 'admin-dash') {
+      get().navigateTo('home');
+    }
+    get().showToast('Logged out of BudolCheck');
+  },
+
+  updateUserProfile: async (name, email, shop) => {
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+
+    if (get().isAuthenticated) {
+      try {
+        const res = await patchUserProfileOnServer({
+          fullName: trimmedName || undefined,
+          email: trimmedEmail || undefined,
+          connectedShop: shop?.trim() || undefined,
+        });
+        if (res.user) {
+          set({
+            authUser: res.user,
+            userName: res.user.fullName,
+            userEmail: res.user.email,
+            connectedShop: res.user.connectedShop,
+          });
+          get().showToast('Account profile updated');
+          return;
+        }
+      } catch (err) {
+        get().showToast(err instanceof Error ? err.message : 'Unable to update profile');
+        return;
+      }
+    }
+
     set((state) => ({
-      userName: name.trim() || state.userName,
-      userEmail: email.trim() || state.userEmail,
+      userName: trimmedName || state.userName,
+      userEmail: trimmedEmail || state.userEmail,
       connectedShop: shop || state.connectedShop,
     }));
   },
@@ -202,20 +619,101 @@ export const useBudolStore = create<BudolState>((set, get) => ({
     });
   },
 
+  runKeywordSearch: async (query, platform) => {
+    const clean = query.trim();
+    if (!clean) return;
+    const activePlatform = platform ?? get().searchPlatformFilter ?? 'all';
+    set({
+      isSearchingCatalog: true,
+      searchQuery: clean,
+      searchPlatformFilter: activePlatform,
+      linkError: null,
+    });
+    const results = await searchMarketplaceListings(clean, activePlatform);
+    set({
+      searchResults: results,
+      isSearchingCatalog: false,
+    });
+    if (get().currentScreen !== 'home') {
+      get().navigateTo('home');
+    }
+  },
+
+  setSearchPlatformFilter: async (platform) => {
+    const query = get().searchQuery;
+    if (!query) {
+      set({ searchPlatformFilter: platform });
+      return;
+    }
+    await get().runKeywordSearch(query, platform);
+  },
+
+  clearSearchResults: () => {
+    set({
+      searchResults: null,
+      searchQuery: '',
+      searchPlatformFilter: 'all',
+    });
+  },
+
+  selectCatalogListingForCheck: async (catalogId) => {
+    set({ isLoadingCheck: true, linkError: null });
+    const record = await createCheckFromCatalogId(catalogId);
+    if (!record) {
+      set({
+        isLoadingCheck: false,
+        linkError: 'Unable to load that catalog listing right now. Please try again.',
+      });
+      return;
+    }
+
+    const reviewsPageData = await fetchPaginatedReviews(record.id, 'all', 1, 2);
+    invalidateClientCache('/api/checks');
+    set((state) => {
+      const filteredExisting = state.historyChecks.filter((item) => item.id !== record.id);
+      return {
+        activeCheckId: record.id,
+        activeCheck: record,
+        hasListing: true,
+        isLoadingCheck: false,
+        reviewsFilter: 'all',
+        reviewsPage: 1,
+        paginatedReviews: reviewsPageData,
+        historyChecks: [record, ...filteredExisting],
+      };
+    });
+    get().navigateTo('product', 'overview');
+    get().showToast(`Loaded verification report for "${record.productTitle}"`);
+  },
+
   runLinkAnalysis: async (rawInput) => {
-    const detection = detectLink(rawInput);
+    const trimmed = rawInput.trim();
+    if (!trimmed) {
+      set({
+        linkError:
+          'Enter a product keyword to search across stores, or paste a marketplace product link.',
+      });
+      return false;
+    }
+
+    const detection = detectLink(trimmed);
     if (detection.kind === 'invalid') {
       set({ linkError: INVALID_LINK_MESSAGE });
       return false;
     }
 
+    if (detection.kind === 'keyword') {
+      await get().runKeywordSearch(trimmed, 'all');
+      return true;
+    }
+
     set({ isLoadingCheck: true, linkError: null });
-    const baseRecord = await analyzeProductInput(rawInput);
+    const baseRecord = await analyzeProductInput(trimmed);
     const isSocial = detection.kind === 'social';
-    const analyzedRecord = {
+    const analyzedRecord: ProductCheckRecord = {
       ...baseRecord,
-      sourceUrl: isSocial ? rawInput.trim() : baseRecord.sourceUrl,
-      importedFrom: isSocial ? detection.label : undefined,
+      sourceUrl: isSocial ? trimmed : baseRecord.sourceUrl,
+      importedFrom: isSocial ? detection.label : baseRecord.importedFrom,
       uploadedImageUrl: undefined,
     };
     const reviewsPageData = await fetchPaginatedReviews(
@@ -225,8 +723,8 @@ export const useBudolStore = create<BudolState>((set, get) => ({
       2
     );
     set((state) => {
-      const existsInHistory = state.historyChecks.some(
-        (item) => item.id === analyzedRecord.id
+      const filteredExisting = state.historyChecks.filter(
+        (item) => item.id !== analyzedRecord.id
       );
       return {
         activeCheckId: analyzedRecord.id,
@@ -236,9 +734,7 @@ export const useBudolStore = create<BudolState>((set, get) => ({
         reviewsFilter: 'all',
         reviewsPage: 1,
         paginatedReviews: reviewsPageData,
-        historyChecks: existsInHistory
-          ? state.historyChecks
-          : [analyzedRecord, ...state.historyChecks],
+        historyChecks: [analyzedRecord, ...filteredExisting],
       };
     });
     get().navigateTo('product', 'overview');
@@ -250,7 +746,7 @@ export const useBudolStore = create<BudolState>((set, get) => ({
     set({ isLoadingCheck: true, linkError: null });
     const base = await analyzeProductInput('');
     const cleanName = fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
-    const record = {
+    const record: ProductCheckRecord = {
       ...base,
       id: `chk_upload_${Date.now()}`,
       sourceUrl: `Uploaded image: ${fileName}`,
@@ -307,6 +803,9 @@ export const useBudolStore = create<BudolState>((set, get) => ({
       else nextSavedAt[targetId] = Date.now();
       return { savedCheckIds: nextSaved, savedAt: nextSavedAt };
     });
+    if (!targetId.startsWith('chk_upload_')) {
+      void toggleSavedCheckOnServer(targetId);
+    }
     get().showToast(
       isSaved ? 'Removed item from Saved list' : 'Saved item to your list'
     );
@@ -318,11 +817,16 @@ export const useBudolStore = create<BudolState>((set, get) => ({
         item.id === itemId ? { ...item, status } : item
       ),
     }));
-    get().showToast(
-      status === 'flagged'
-        ? 'Listing confirmed as high-risk scam'
-        : 'Report dismissed by moderator'
-    );
+    void patchAdminQueueStatus(itemId, status);
+    const labelMap: Record<AdminReportStatus, string> = {
+      pending: 'Marked report as Pending',
+      under_review: 'Marked report as Under Review',
+      investigating: 'Marked report as Investigating',
+      resolved: 'Marked report as Resolved',
+      flagged: 'Listing confirmed as high-risk scam',
+      dismissed: 'Report dismissed by moderator',
+    };
+    get().showToast(labelMap[status]);
   },
 
   showToast: (message) => {

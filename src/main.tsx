@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createTheme, MantineProvider } from '@mantine/core';
+import { Analytics } from '@vercel/analytics/react';
 import '@fontsource-variable/inter';
 import '@fontsource-variable/fraunces';
 import '@fontsource-variable/quicksand';
@@ -23,6 +24,7 @@ if (rootElement) {
     <React.StrictMode>
       <MantineProvider theme={budolTheme}>
         <App />
+        <Analytics />
       </MantineProvider>
     </React.StrictMode>
   );

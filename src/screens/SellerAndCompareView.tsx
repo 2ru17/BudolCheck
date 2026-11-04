@@ -3,20 +3,56 @@ import { Modal } from '@mantine/core';
 import { useBudolStore } from '../store/useBudolStore.ts';
 import { AnimatedCheckCircle } from '../components/visuals/AnimeCheckmark.tsx';
 import {
+  AlertIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
+  CheckIcon,
+  ExternalLinkIcon,
   PlatformBadgeSvg,
   ProductIllustrationSvg,
   ShieldIcon,
   StarIcon,
 } from '../components/icons/SvgIcons.tsx';
-import { buildShopSearchUrl, formatCurrency } from '../lib/formatters.ts';
+import {
+  buildStorefrontSearchUrl,
+  formatCurrency,
+  resolveListingExternalUrl,
+} from '../lib/formatters.ts';
+import { resolveCleanProductImageUrl } from '../lib/productContent.ts';
 import { Stagger, StaggerItem } from '../components/visuals/Motion.tsx';
 
 export const SellerCheckView: React.FC = () => {
   const activeCheck = useBudolStore((s) => s.activeCheck);
+  const isAuthenticated = useBudolStore((s) => s.isAuthenticated);
+  const role = useBudolStore((s) => s.role);
   const navigateTo = useBudolStore((s) => s.navigateTo);
+  const setSellerPortalTab = useBudolStore((s) => s.setSellerPortalTab);
+  const setAdminConsoleTab = useBudolStore((s) => s.setAdminConsoleTab);
+  const submitReportToAdminQueue = useBudolStore((s) => s.submitReportToAdminQueue);
+  const showToast = useBudolStore((s) => s.showToast);
+
   const [dossierOpen, setDossierOpen] = useState(false);
+  const [heroImgFailed, setHeroImgFailed] = useState(false);
+
+  const activeRole = isAuthenticated ? role : 'user';
+
+  const listingExternalUrl = resolveListingExternalUrl(
+    activeCheck.sourceUrl,
+    activeCheck.platformName,
+    activeCheck.productTitle
+  );
+
+  const storeExternalUrl = buildStorefrontSearchUrl(
+    activeCheck.platformName,
+    activeCheck.seller.storeName,
+    activeCheck.productTitle
+  );
+
+  const heroImageUrl = resolveCleanProductImageUrl(
+    activeCheck.uploadedImageUrl || activeCheck.imageUrls?.[0],
+    activeCheck.productTitle,
+    0
+  );
 
   const checklistRows = [
     {
@@ -41,6 +77,19 @@ export const SellerCheckView: React.FC = () => {
     },
   ];
 
+  const handleFlagSellerToQueue = async () => {
+    await submitReportToAdminQueue({
+      productTitle: `${activeCheck.seller.storeName} (${activeCheck.productTitle})`,
+      subtitle: `Store rating ${activeCheck.seller.rating}/5 • Permit ${activeCheck.seller.certificateId}`,
+      platform: activeCheck.platformName,
+      flagReason: `Store verification review requested for ${activeCheck.seller.storeName}`,
+      reportCategory: 'report',
+      priceAnomaly: `Listed at ${formatCurrency(activeCheck.listedPricePhp)}`,
+      illustrationKey: activeCheck.illustrationKey,
+      thumbnailUrl: heroImageUrl,
+    });
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -53,27 +102,56 @@ export const SellerCheckView: React.FC = () => {
           <span>Back to Home</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => navigateTo('compare')}
-          className="budol-btn-primary px-4 py-2 text-xs"
-        >
-          <span>Compare to Buy</span>
-          <ArrowRightIcon size={15} />
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={listingExternalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="budol-btn-secondary px-3.5 py-2 text-xs"
+          >
+            <span>Open Listing on {activeCheck.platformName}</span>
+            <ExternalLinkIcon size={14} />
+          </a>
+
+          <button
+            type="button"
+            onClick={() => navigateTo('compare')}
+            className="budol-btn-primary px-4 py-2 text-xs"
+          >
+            <span>Compare to Buy</span>
+            <ArrowRightIcon size={15} />
+          </button>
+        </div>
       </div>
 
       <div className="budol-card bg-butter p-5">
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div className="flex items-center gap-4">
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border-[1.5px] border-ink bg-cream shadow-crisp">
-              <ProductIllustrationSvg
-                variant={activeCheck.illustrationKey}
-                size={64}
-              />
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-[1.5px] border-ink bg-white shadow-crisp">
+              {heroImageUrl && !heroImgFailed ? (
+                <img
+                  src={heroImageUrl}
+                  alt={activeCheck.productTitle}
+                  loading="lazy"
+                  decoding="async"
+                  referrerPolicy="no-referrer"
+                  onError={() => setHeroImgFailed(true)}
+                  className="h-full w-full object-contain p-1"
+                />
+              ) : (
+                <ProductIllustrationSvg
+                  variant={activeCheck.illustrationKey}
+                  size={64}
+                />
+              )}
             </div>
             <div>
-              <PlatformBadgeSvg platform={activeCheck.platformName} />
+              <div className="flex flex-wrap items-center gap-2">
+                <PlatformBadgeSvg platform={activeCheck.platformName} />
+                <span className="sticker bg-white text-ink">
+                  Seller: {activeCheck.seller.storeName}
+                </span>
+              </div>
               <h1 className="font-editorial mt-1.5 text-2xl font-bold text-ink">
                 {activeCheck.productTitle}
               </h1>
@@ -83,14 +161,97 @@ export const SellerCheckView: React.FC = () => {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setDossierOpen(true)}
-            className="budol-btn-secondary text-xs"
-          >
-            <ShieldIcon size={16} />
-            <span>View Seller Info</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={storeExternalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="budol-btn-primary text-xs"
+            >
+              <span>Visit Store on {activeCheck.platformName}</span>
+              <ExternalLinkIcon size={14} />
+            </a>
+
+            <button
+              type="button"
+              onClick={() => setDossierOpen(true)}
+              className="budol-btn-secondary text-xs"
+            >
+              <ShieldIcon size={16} />
+              <span>View Seller Dossier</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-ink/15 pt-3.5">
+          {activeRole === 'admin' ? (
+            <>
+              <span className="text-xs font-semibold text-ink">
+                Moderator Controls: Inspect store credentials or escalate this seller to the Trust &amp; Safety Queue.
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleFlagSellerToQueue()}
+                  className="rounded-full border-[1.5px] border-ink bg-blush px-3.5 py-1.5 text-xs font-bold text-flag shadow-crisp hover:opacity-90"
+                >
+                  Flag Store in Queue
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    showToast(`Verified permit ${activeCheck.seller.certificateId} for ${activeCheck.seller.storeName}`);
+                  }}
+                  className="rounded-full border-[1.5px] border-ink bg-mint px-3.5 py-1.5 text-xs font-bold text-verified shadow-crisp hover:opacity-90"
+                >
+                  Approve Store Permit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminConsoleTab('reports')}
+                  className="rounded-full border-[1.5px] border-ink bg-white px-3.5 py-1.5 text-xs font-bold text-ink shadow-crisp hover:bg-cream"
+                >
+                  Open Moderation Queue
+                </button>
+              </div>
+            </>
+          ) : activeRole === 'seller' ? (
+            <>
+              <span className="text-xs font-semibold text-ink">
+                Merchant Mode: Benchmark your store compliance against this seller or update your official specs.
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSellerPortalTab('guidelines')}
+                  className="rounded-full border-[1.5px] border-ink bg-mint px-3.5 py-1.5 text-xs font-bold text-forest shadow-crisp hover:opacity-90"
+                >
+                  Update My Official Specs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSellerPortalTab('profile')}
+                  className="rounded-full border-[1.5px] border-ink bg-white px-3.5 py-1.5 text-xs font-bold text-ink shadow-crisp hover:bg-cream"
+                >
+                  My Shop Profile
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <span className="text-xs font-medium text-ink-muted">
+                Spot fake store badges or unfulfilled orders from {activeCheck.seller.storeName}?
+              </span>
+              <button
+                type="button"
+                onClick={() => void handleFlagSellerToQueue()}
+                className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-ink bg-white px-3.5 py-1.5 text-xs font-semibold text-ink shadow-crisp hover:bg-blush hover:text-flag"
+              >
+                <AlertIcon size={13} />
+                <span>Report Seller to Moderators</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -141,9 +302,20 @@ export const SellerCheckView: React.FC = () => {
 
         <div className="space-y-4 lg:col-span-5">
           <div className="budol-card p-5">
-            <h2 className="font-editorial text-lg font-bold text-ink">
-              Store Metrics Snapshot
-            </h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-editorial text-lg font-bold text-ink">
+                Store Metrics Snapshot
+              </h2>
+              <a
+                href={storeExternalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-bold text-forest underline hover:text-ink"
+              >
+                <span>Visit Store</span>
+                <ExternalLinkIcon size={12} />
+              </a>
+            </div>
             <dl className="mt-3 divide-y divide-ink/15 text-sm">
               <div className="flex items-center justify-between py-2.5">
                 <dt className="font-medium text-ink-muted">Store Name</dt>
@@ -174,6 +346,27 @@ export const SellerCheckView: React.FC = () => {
             <div className="mt-4 rounded-xl border-[1.5px] border-ink bg-butter p-3 text-xs font-normal leading-relaxed text-ink shadow-crisp">
               <strong className="font-semibold text-caution">Verification Note: </strong>
               {activeCheck.seller.unverifiedNote}
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <a
+                href={storeExternalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="budol-btn-primary text-xs"
+              >
+                <span>Visit {activeCheck.platformName} Store</span>
+                <ExternalLinkIcon size={13} />
+              </a>
+              <a
+                href={listingExternalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="budol-btn-secondary text-xs"
+              >
+                <span>Open Product Listing</span>
+                <ExternalLinkIcon size={13} />
+              </a>
             </div>
           </div>
 
@@ -235,13 +428,24 @@ export const SellerCheckView: React.FC = () => {
             {activeCheck.seller.unverifiedNote}
           </p>
 
-          <button
-            type="button"
-            onClick={() => setDossierOpen(false)}
-            className="budol-btn-primary w-full text-xs"
-          >
-            Close Seller Dossier
-          </button>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <a
+              href={storeExternalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="budol-btn-primary w-full text-xs"
+            >
+              <span>Visit Store on {activeCheck.platformName}</span>
+              <ExternalLinkIcon size={13} />
+            </a>
+            <button
+              type="button"
+              onClick={() => setDossierOpen(false)}
+              className="budol-btn-secondary w-full text-xs"
+            >
+              <span>Close Dossier</span>
+            </button>
+          </div>
         </div>
       </Modal>
     </div>
@@ -251,6 +455,18 @@ export const SellerCheckView: React.FC = () => {
 export const CompareToBuyView: React.FC = () => {
   const activeCheck = useBudolStore((s) => s.activeCheck);
   const navigateTo = useBudolStore((s) => s.navigateTo);
+
+  const listingExternalUrl = resolveListingExternalUrl(
+    activeCheck.sourceUrl,
+    activeCheck.platformName,
+    activeCheck.productTitle
+  );
+
+  const heroImageUrl = resolveCleanProductImageUrl(
+    activeCheck.uploadedImageUrl || activeCheck.imageUrls?.[0],
+    activeCheck.productTitle,
+    0
+  );
 
   return (
     <div className="space-y-5">
@@ -264,14 +480,26 @@ export const CompareToBuyView: React.FC = () => {
           <span>Back to Product Check</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => navigateTo('summary')}
-          className="budol-btn-primary px-4 py-2 text-xs"
-        >
-          <span>View Final Summary</span>
-          <ArrowRightIcon size={15} />
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={listingExternalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="budol-btn-secondary px-3.5 py-2 text-xs"
+          >
+            <span>Open Current Listing ({activeCheck.platformName})</span>
+            <ExternalLinkIcon size={14} />
+          </a>
+
+          <button
+            type="button"
+            onClick={() => navigateTo('summary')}
+            className="budol-btn-primary px-4 py-2 text-xs"
+          >
+            <span>View Final Summary</span>
+            <ArrowRightIcon size={15} />
+          </button>
+        </div>
       </div>
 
       <div className="budol-card bg-sky p-5">
@@ -300,7 +528,7 @@ export const CompareToBuyView: React.FC = () => {
           {[
             {
               key: 'current',
-              label: `${activeCheck.platformName} (this listing)`,
+              label: `${activeCheck.platformName} (${activeCheck.seller.storeName})`,
               price: activeCheck.listedPricePhp,
               tone: 'bg-flag',
             },
@@ -338,69 +566,85 @@ export const CompareToBuyView: React.FC = () => {
           const savingsPhp = Math.max(0, activeCheck.listedPricePhp - cmp.pricePhp);
           return (
             <StaggerItem key={cmp.id} className="h-full">
-            <div
-              className={`budol-card flex h-full flex-col justify-between p-5 ${
-                cmp.isBestPrice
-                  ? 'bg-mint md:-translate-y-2 md:shadow-brutal-lg'
-                  : 'bg-white'
-              }`}
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2">
-                  <PlatformBadgeSvg platform={cmp.platformName} />
-                  {cmp.isBestPrice && (
-                    <span className="sticker bg-verified text-white">
-                      Best Value
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-[1.5px] border-ink bg-cream shadow-crisp">
-                    <ProductIllustrationSvg
-                      variant={activeCheck.illustrationKey}
-                      size={50}
-                    />
+              <div
+                className={`budol-card flex h-full flex-col justify-between p-5 ${
+                  cmp.isBestPrice
+                    ? 'bg-mint md:-translate-y-2 md:shadow-brutal-lg'
+                    : 'bg-white'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <PlatformBadgeSvg platform={cmp.platformName} />
+                    {cmp.isBestPrice && (
+                      <span className="sticker bg-verified text-white">
+                        <CheckIcon size={12} />
+                        <span>Best Value</span>
+                      </span>
+                    )}
                   </div>
-                  <div>
-                    <h2 className="text-base font-semibold text-ink">
-                      {cmp.productTitle}
-                    </h2>
-                    <div className="mt-1 flex items-center gap-1 text-xs font-semibold tabular-nums text-ink">
-                      <StarIcon size={13} filled />
-                      <span>{cmp.starRating} / 5</span>
+
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border-[1.5px] border-ink bg-white shadow-crisp">
+                      {heroImageUrl ? (
+                        <img
+                          src={heroImageUrl}
+                          alt={cmp.productTitle}
+                          loading="lazy"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                          className="h-full w-full object-contain p-1"
+                        />
+                      ) : (
+                        <ProductIllustrationSvg
+                          variant={activeCheck.illustrationKey}
+                          size={50}
+                        />
+                      )}
+                    </div>
+                    <div>
+                      <h2 className="line-clamp-2 text-base font-semibold text-ink">
+                        {cmp.productTitle}
+                      </h2>
+                      <div className="mt-1 flex items-center gap-1 text-xs font-semibold tabular-nums text-ink">
+                        <StarIcon size={13} filled />
+                        <span>{cmp.starRating} / 5</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="mt-4 rounded-xl border-[1.5px] border-ink bg-cream p-3.5 shadow-crisp">
-                  <span className="text-xs font-medium text-ink-muted">
-                    Platform Price
-                  </span>
-                  <p className="text-2xl font-bold tabular-nums text-forest">
-                    {formatCurrency(cmp.pricePhp)}
-                  </p>
-                  <p className="mt-1 text-xs font-semibold text-verified">
-                    {cmp.shippingPerk}
-                  </p>
-                  {savingsPhp > 0 && (
-                    <p className="mt-1 text-xs font-semibold tabular-nums text-flag">
-                      Save {formatCurrency(savingsPhp)} vs. current listing
+                  <div className="mt-4 rounded-xl border-[1.5px] border-ink bg-cream p-3.5 shadow-crisp">
+                    <span className="text-xs font-medium text-ink-muted">
+                      Platform Price
+                    </span>
+                    <p className="text-2xl font-bold tabular-nums text-forest">
+                      {formatCurrency(cmp.pricePhp)}
                     </p>
-                  )}
+                    <p className="mt-1 text-xs font-semibold text-verified">
+                      {cmp.shippingPerk}
+                    </p>
+                    {savingsPhp > 0 && (
+                      <p className="mt-1 text-xs font-semibold tabular-nums text-flag">
+                        Save {formatCurrency(savingsPhp)} vs. current listing
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <a
-                href={buildShopSearchUrl(cmp.platformName, cmp.productTitle)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="budol-btn-primary mt-4 w-full text-xs"
-              >
-                <span>Open on {cmp.platformName}</span>
-                <ArrowRightIcon size={15} />
-              </a>
-            </div>
+                <a
+                  href={resolveListingExternalUrl(
+                    cmp.sourceUrl,
+                    cmp.platformName,
+                    cmp.productTitle
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="budol-btn-primary mt-4 w-full text-xs"
+                >
+                  <span>Visit on {cmp.platformName}</span>
+                  <ExternalLinkIcon size={14} />
+                </a>
+              </div>
             </StaggerItem>
           );
         })}

@@ -10,6 +10,7 @@ import {
   AlertIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
+  ExternalLinkIcon,
   HeartIcon,
   PlatformBadgeSvg,
   ProductIllustrationSvg,
@@ -19,67 +20,91 @@ import {
   ProductOverviewSkeleton,
   ReviewListSkeleton,
 } from '../components/visuals/BudolSkeletons.tsx';
-import { buildShopSearchUrl, formatCurrency } from '../lib/formatters.ts';
-import { buildProductDetails } from '../lib/productContent.ts';
+import {
+  buildStorefrontSearchUrl,
+  formatCurrency,
+  inferPlatformFromUrlOrBadge,
+  resolveListingExternalUrl,
+} from '../lib/formatters.ts';
+import { buildProductDetails, resolveCleanProductImageUrl } from '../lib/productContent.ts';
 import { ProductGallery } from '../components/visuals/ProductGallery.tsx';
 
 const SimilarCard = memo<{
   item: SimilarProductItem;
-  platformName: 'Shopee' | 'Lazada' | 'TikTok Shop' | 'Temu';
-}>(({ item, platformName }) => (
-  <div className="budol-card flex flex-col justify-between p-4">
-    <div>
-      <div className="relative flex h-28 w-full items-center justify-center rounded-xl border-[1.5px] border-ink bg-butter">
-        <ProductIllustrationSvg variant={item.illustrationType} size={68} />
-        <span className="absolute right-2 top-2 rounded-full border border-ink bg-flag px-2 py-0.5 text-[11px] font-semibold tabular-nums text-white shadow-crisp">
-          -{item.discountPercentage}%
-        </span>
+  platformName: 'Shopee' | 'Lazada' | 'Temu';
+}>(({ item, platformName }) => {
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const resolvedThumbUrl = resolveCleanProductImageUrl(item.thumbnailUrl, item.title, 0);
+  const itemPlatform = inferPlatformFromUrlOrBadge(item.sourceUrl, item.promoBadge, platformName);
+
+  return (
+    <div className="budol-card flex flex-col justify-between p-4">
+      <div>
+        <div className="relative flex h-28 w-full items-center justify-center overflow-hidden rounded-xl border-[1.5px] border-ink bg-white">
+          {resolvedThumbUrl && !thumbFailed ? (
+            <img
+              src={resolvedThumbUrl}
+              alt={item.title}
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+              onError={() => setThumbFailed(true)}
+              className="h-full w-full object-contain p-1"
+            />
+          ) : (
+            <ProductIllustrationSvg variant={item.illustrationType} size={68} />
+          )}
+          <span className="absolute right-2 top-2 rounded-full border border-ink bg-flag px-2 py-0.5 text-[11px] font-semibold tabular-nums text-white shadow-crisp">
+            -{item.discountPercentage}%
+          </span>
+        </div>
+
+        <h4 className="mt-3 line-clamp-1 text-sm font-semibold text-ink">
+          {item.title}
+        </h4>
+
+        <div className="mt-1 flex items-baseline gap-2">
+          <span className="text-base font-bold tabular-nums text-flag">
+            {formatCurrency(item.salePricePhp)}
+          </span>
+          <span className="text-xs font-normal tabular-nums text-ink-muted line-through">
+            {formatCurrency(item.originalPricePhp)}
+          </span>
+        </div>
+
+        <div className="mt-2">
+          <span className="sticker bg-butter text-ink">
+            {item.promoBadge}
+          </span>
+        </div>
       </div>
 
-      <h4 className="mt-3 line-clamp-1 text-sm font-semibold text-ink">
-        {item.title}
-      </h4>
+      <div className="mt-3 flex items-center justify-between border-t border-ink/15 pt-2.5">
+        <div className="flex items-center gap-1.5 text-xs font-semibold tabular-nums text-ink">
+          <StarIcon size={13} filled />
+          <span>{item.starRating}</span>
+          <span className="font-normal text-ink-muted">({item.soldCountText})</span>
+        </div>
 
-      <div className="mt-1 flex items-baseline gap-2">
-        <span className="text-base font-bold tabular-nums text-flag">
-          {formatCurrency(item.salePricePhp)}
-        </span>
-        <span className="text-xs font-normal tabular-nums text-ink-muted line-through">
-          {formatCurrency(item.originalPricePhp)}
-        </span>
-      </div>
-
-      <div className="mt-2">
-        <span className="sticker bg-butter text-ink">
-          {item.promoBadge}
-        </span>
+        <a
+          href={resolveListingExternalUrl(item.sourceUrl, itemPlatform, item.title)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="budol-btn-secondary !min-h-[40px] !px-3.5 !py-1 text-xs"
+        >
+          <span>Open Listing</span>
+          <ArrowRightIcon size={13} />
+        </a>
       </div>
     </div>
-
-    <div className="mt-3 flex items-center justify-between border-t border-ink/15 pt-2.5">
-      <div className="flex items-center gap-1.5 text-xs font-semibold tabular-nums text-ink">
-        <StarIcon size={13} filled />
-        <span>{item.starRating}</span>
-        <span className="font-normal text-ink-muted">({item.soldCountText})</span>
-      </div>
-
-      <a
-        href={buildShopSearchUrl(platformName, item.title)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="budol-btn-secondary !min-h-[40px] !px-3.5 !py-1 text-xs"
-      >
-        <span>Open Listing</span>
-        <ArrowRightIcon size={13} />
-      </a>
-    </div>
-  </div>
-));
+  );
+});
 
 SimilarCard.displayName = 'SimilarCard';
 
 export const ProductDetailsView: React.FC = () => {
   const activeCheck = useBudolStore((s) => s.activeCheck);
+  const role = useBudolStore((s) => s.role);
   const currentSubTab = useBudolStore((s) => s.currentSubTab);
   const isLoadingCheck = useBudolStore((s) => s.isLoadingCheck);
   const reviewsFilter = useBudolStore((s) => s.reviewsFilter);
@@ -91,6 +116,9 @@ export const ProductDetailsView: React.FC = () => {
   const setSubTab = useBudolStore((s) => s.setSubTab);
   const setReviewsQuery = useBudolStore((s) => s.setReviewsQuery);
   const toggleSavedCheck = useBudolStore((s) => s.toggleSavedCheck);
+  const setSellerPortalTab = useBudolStore((s) => s.setSellerPortalTab);
+  const setAdminConsoleTab = useBudolStore((s) => s.setAdminConsoleTab);
+  const submitReportToAdminQueue = useBudolStore((s) => s.submitReportToAdminQueue);
 
   const isSaved = savedCheckIds.includes(activeCheck.id);
   const [selectedVariant, setSelectedVariant] = useState('');
@@ -159,40 +187,61 @@ export const ProductDetailsView: React.FC = () => {
             </h1>
 
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm tabular-nums text-ink">
-              <span className="inline-flex items-center gap-1 font-semibold">
-                <StarIcon size={15} filled />
-                {activeCheck.reviewSummary.productAverageRating}
-              </span>
-              <span className="text-ink-muted">
-                {activeCheck.reviewSummary.productReviewsCount} ratings
-              </span>
+              {activeCheck.reviewSummary.productReviewsCount > 0 ? (
+                <>
+                  <span className="inline-flex items-center gap-1 font-semibold">
+                    <StarIcon size={15} filled />
+                    {activeCheck.reviewSummary.productAverageRating}
+                  </span>
+                  <span className="text-ink-muted">
+                    {activeCheck.reviewSummary.productReviewsCount.toLocaleString()} ratings
+                  </span>
+                </>
+              ) : (
+                <span className="text-xs font-medium text-ink-muted">
+                  Open live listing to inspect current buyer rating count
+                </span>
+              )}
               {activeCheck.soldCountText && (
                 <span className="text-ink-muted">{activeCheck.soldCountText}</span>
               )}
             </div>
 
-            <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xl border-[1.5px] border-ink bg-cream px-4 py-3">
-              <span className="text-3xl font-bold tabular-nums text-flag">
-                {formatCurrency(activeCheck.listedPricePhp)}
-              </span>
-              {activeCheck.originalPricePhp &&
-                activeCheck.originalPricePhp > activeCheck.listedPricePhp && (
-                  <>
-                    <span className="text-sm font-normal tabular-nums text-ink-muted line-through">
-                      {formatCurrency(activeCheck.originalPricePhp)}
-                    </span>
-                    <span className="sticker bg-flag text-white tabular-nums">
-                      -
-                      {Math.round(
-                        (1 -
-                          activeCheck.listedPricePhp /
-                            activeCheck.originalPricePhp) *
-                          100
-                      )}
-                      %
-                    </span>
-                  </>
+            <div className="mt-3 rounded-xl border-[1.5px] border-ink bg-cream px-4 py-3">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="text-3xl font-bold tabular-nums text-flag">
+                  {formatCurrency(activeCheck.listedPricePhp)}
+                </span>
+                {activeCheck.isPriceEstimated && (
+                  <span className="sticker bg-butter text-ink">
+                    Category Benchmark Est.
+                  </span>
                 )}
+                {!activeCheck.isPriceEstimated &&
+                  activeCheck.originalPricePhp &&
+                  activeCheck.originalPricePhp > activeCheck.listedPricePhp && (
+                    <>
+                      <span className="text-sm font-normal tabular-nums text-ink-muted line-through">
+                        {formatCurrency(activeCheck.originalPricePhp)}
+                      </span>
+                      <span className="sticker bg-flag text-white tabular-nums">
+                        -
+                        {Math.round(
+                          (1 -
+                            activeCheck.listedPricePhp /
+                              activeCheck.originalPricePhp) *
+                            100
+                        )}
+                        %
+                      </span>
+                    </>
+                  )}
+              </div>
+              {activeCheck.isPriceEstimated && (
+                <p className="mt-1.5 text-xs font-normal leading-relaxed text-ink-muted">
+                  Exact live variation price is gated by {activeCheck.platformName} browser protection. Figure shown is the typical Philippine market benchmark for this category. Click Open on {activeCheck.platformName} below to confirm live checkout price.
+                </p>
+              )}
             </div>
 
             {activeCheck.shippingNote && (
@@ -246,18 +295,71 @@ export const ProductDetailsView: React.FC = () => {
                 <span>Compare to Buy</span>
                 <ArrowRightIcon size={15} />
               </button>
-              {/^https?:\/\//i.test(activeCheck.sourceUrl) && (
+              <a
+                href={resolveListingExternalUrl(
+                  activeCheck.sourceUrl,
+                  activeCheck.platformName,
+                  activeCheck.productTitle
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="budol-btn-secondary text-xs"
+              >
+                <span>
+                  {`Open on ${activeCheck.importedFrom || activeCheck.platformName}`}
+                </span>
+                <ExternalLinkIcon size={14} />
+              </a>
+              {role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void submitReportToAdminQueue({
+                      productTitle: activeCheck.productTitle,
+                      subtitle: `${activeCheck.seller.storeName} • Spec & Price Audit`,
+                      platform: activeCheck.platformName,
+                      flagReason:
+                        activeCheck.overview.contradictionWarning ||
+                        'Flagged by Moderator during Product Check',
+                      reportCategory: 'report',
+                      priceAnomaly: `${formatCurrency(activeCheck.listedPricePhp)} (${activeCheck.redFlags.riskLabel})`,
+                      illustrationKey: activeCheck.illustrationKey,
+                      thumbnailUrl: activeCheck.imageUrls?.[0],
+                      sourceUrl: activeCheck.sourceUrl,
+                    });
+                    setAdminConsoleTab('reports');
+                  }}
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border-[1.5px] border-ink bg-flag px-4 py-2 text-xs font-bold text-white shadow-crisp"
+                >
+                  <AlertIcon size={14} />
+                  <span>Flag Listing in Queue</span>
+                </button>
+              )}
+              {role === 'seller' && (
+                <button
+                  type="button"
+                  onClick={() => setSellerPortalTab('guidelines')}
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border-[1.5px] border-ink bg-[#D7E6D0] px-4 py-2 text-xs font-bold text-ink shadow-crisp hover:bg-mint"
+                >
+                  <span>Audit Spec in Seller Hub</span>
+                  <ArrowRightIcon size={14} />
+                </button>
+              )}
+            </div>
+
+            {/^https?:\/\//i.test(activeCheck.sourceUrl) && (
+              <div className="mt-3 flex items-center gap-2 rounded-lg border border-ink/15 bg-cream/60 px-3 py-2 text-xs text-ink-muted">
+                <span className="shrink-0 font-semibold text-ink">Reference URL:</span>
                 <a
                   href={activeCheck.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="budol-btn-secondary text-xs"
+                  className="truncate underline decoration-ink/30 underline-offset-2 hover:text-ink"
                 >
-                  <span>Open on {activeCheck.importedFrom || activeCheck.platformName}</span>
-                  <ArrowRightIcon size={15} />
+                  {activeCheck.sourceUrl}
                 </a>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="budol-card flex flex-wrap items-center justify-between gap-3 bg-white p-4">
@@ -275,13 +377,29 @@ export const ProductDetailsView: React.FC = () => {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => navigateTo('seller')}
-              className="budol-btn-secondary text-xs"
-            >
-              <span>View Seller Check</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href={buildStorefrontSearchUrl(
+                  activeCheck.platformName,
+                  activeCheck.seller.storeName,
+                  activeCheck.productTitle
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="budol-btn-secondary text-xs"
+              >
+                <span>Visit Store on {activeCheck.platformName}</span>
+                <ExternalLinkIcon size={13} />
+              </a>
+              <button
+                type="button"
+                onClick={() => navigateTo('seller')}
+                className="budol-btn-primary text-xs"
+              >
+                <span>View Seller Check</span>
+                <ArrowRightIcon size={14} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -615,10 +733,25 @@ export const ProductDetailsView: React.FC = () => {
               <strong className="font-semibold text-verified">
                 Price Reality Benchmark:
               </strong>{' '}
-              Competing stores offer similar silicone mats between{' '}
-              {formatCurrency(9.9)} and{' '}
-              {formatCurrency(88.92)} compared to this listing at{' '}
-              {formatCurrency(activeCheck.listedPricePhp)}.
+              {activeCheck.similarProducts.length > 0 ? (
+                <>
+                  Competing stores offer similar alternatives between{' '}
+                  {formatCurrency(
+                    Math.min(...activeCheck.similarProducts.map((item) => item.salePricePhp))
+                  )}{' '}
+                  and{' '}
+                  {formatCurrency(
+                    Math.max(...activeCheck.similarProducts.map((item) => item.salePricePhp))
+                  )}{' '}
+                  compared to this listing at{' '}
+                  {formatCurrency(activeCheck.listedPricePhp)}.
+                </>
+              ) : (
+                <>
+                  Compare this listing at {formatCurrency(activeCheck.listedPricePhp)} against
+                  other marketplace sellers before checking out.
+                </>
+              )}
             </p>
           </div>
 

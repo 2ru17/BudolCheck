@@ -74,7 +74,7 @@ export const ShaderHeroBanner: React.FC<ShaderHeroBannerProps> = React.memo(
             <p className="mt-4 max-w-xl text-sm font-normal leading-relaxed text-white/95 md:text-[15px]">
               BudolCheck helps you verify if online stores and product listings
               are legitimate before making a purchase across Shopee, Lazada,
-              TikTok Shop, and Temu.
+              and Temu.
             </p>
 
             <div className="mt-5 flex flex-wrap items-center gap-3">

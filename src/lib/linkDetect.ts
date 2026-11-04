@@ -7,13 +7,12 @@ export interface LinkDetection {
 
 const MARKETPLACE_HOSTS: Array<{ match: string; label: string }> = [
   { match: 'shopee.', label: 'Shopee' },
+  { match: 'shp.ee', label: 'Shopee' },
   { match: 'lazada.', label: 'Lazada' },
   { match: 'temu.', label: 'Temu' },
-  { match: 'shop.tiktok.com', label: 'TikTok Shop' },
 ];
 
 const SOCIAL_HOSTS: Array<{ match: string; label: string }> = [
-  { match: 'tiktok.com', label: 'TikTok' },
   { match: 'instagram.com', label: 'Instagram' },
   { match: 'facebook.com', label: 'Facebook' },
   { match: 'fb.com', label: 'Facebook' },

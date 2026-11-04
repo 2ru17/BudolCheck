@@ -1,4 +1,5 @@
 import React from 'react';
+import { IllustrationKey } from '../../types/budol.ts';
 
 interface IconProps {
   className?: string;
@@ -53,9 +54,76 @@ export const ShoppingBagMascotSvg: React.FC<{ className?: string; size?: number 
 );
 
 export const ProductIllustrationSvg: React.FC<{
-  variant: 'cupmat' | 'earbuds' | 'serum' | 'coaster' | 'cat' | 'rabbit' | 'car';
+  variant: IllustrationKey;
   size?: number;
 }> = ({ variant, size = 72 }) => {
+  if (variant === 'phonecase') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+        <rect x="28" y="14" width="44" height="72" rx="11" fill="#DCE9F6" stroke="#2C2623" strokeWidth="3" />
+        <rect x="33" y="20" width="16" height="22" rx="5" fill="#FFFFFF" stroke="#2C2623" strokeWidth="2.4" />
+        <circle cx="41" cy="26" r="3" fill="#2C2623" />
+        <circle cx="41" cy="35" r="3" fill="#2C2623" />
+        <circle cx="50" cy="56" r="11" stroke="#3E5634" strokeWidth="2.5" strokeDasharray="4 3" />
+        <line x1="50" y1="68" x2="50" y2="76" stroke="#3E5634" strokeWidth="2.5" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (variant === 'shoes') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+        <path
+          d="M16 66C16 56 26 52 36 48L48 34C52 34 56 40 60 44C69 48 84 50 86 62V70H16V66Z"
+          fill="#E4EFE0"
+          stroke="#2C2623"
+          strokeWidth="3"
+          strokeLinejoin="round"
+        />
+        <rect x="14" y="68" width="74" height="9" rx="4" fill="#FFFFFF" stroke="#2C2623" strokeWidth="2.8" />
+        <path d="M36 56L54 62" stroke="#3E5634" strokeWidth="3" strokeLinecap="round" />
+        <line x1="44" y1="42" x2="50" y2="45" stroke="#2C2623" strokeWidth="2.4" strokeLinecap="round" />
+        <line x1="40" y1="47" x2="46" y2="50" stroke="#2C2623" strokeWidth="2.4" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (variant === 'bag') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+        <path d="M36 36C36 22 42 16 50 16C58 16 64 22 64 36" stroke="#2C2623" strokeWidth="3.2" strokeLinecap="round" />
+        <path d="M24 36H76L80 82H20L24 36Z" fill="#FAD6B8" stroke="#2C2623" strokeWidth="3" strokeLinejoin="round" />
+        <rect x="38" y="50" width="24" height="18" rx="4" fill="#FFFDF9" stroke="#2C2623" strokeWidth="2.2" />
+        <circle cx="50" cy="43" r="2.5" fill="#2C2623" />
+      </svg>
+    );
+  }
+
+  if (variant === 'dress') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+        <path
+          d="M38 18L44 26H56L62 18L70 28L62 42L76 82H24L38 42L30 28L38 18Z"
+          fill="#FCE2DF"
+          stroke="#2C2623"
+          strokeWidth="3"
+          strokeLinejoin="round"
+        />
+        <line x1="38" y1="44" x2="62" y2="44" stroke="#2C2623" strokeWidth="2.4" />
+      </svg>
+    );
+  }
+
+  if (variant === 'watch') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+        <rect x="41" y="14" width="18" height="72" rx="5" fill="#FDEEC8" stroke="#2C2623" strokeWidth="2.6" />
+        <circle cx="50" cy="50" r="21" fill="#FFFFFF" stroke="#2C2623" strokeWidth="3" />
+        <polyline points="50,38 50,50 58,54" stroke="#2C2623" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
   if (variant === 'earbuds') {
     return (
       <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
@@ -105,6 +173,84 @@ export const ProductIllustrationSvg: React.FC<{
     );
   }
 
+  if (variant === 'umbrella') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+        <path
+          d="M14 50C14 28 30 16 50 16C70 16 86 28 86 50C77 45 68 45 62 50C55 45 45 45 38 50C32 45 23 45 14 50Z"
+          fill="#374151"
+          stroke="#2C2623"
+          strokeWidth="3"
+          strokeLinejoin="round"
+        />
+        <path d="M50 16C42 26 38 38 38 50" stroke="#9CA3AF" strokeWidth="2.2" />
+        <path d="M50 16C58 26 62 38 62 50" stroke="#9CA3AF" strokeWidth="2.2" />
+        <line x1="50" y1="12" x2="50" y2="16" stroke="#2C2623" strokeWidth="3" strokeLinecap="round" />
+        <path
+          d="M50 50V78C50 83 45 86 41 86C37 86 34 83 34 79"
+          stroke="#2C2623"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
+  }
+
+  if (variant === 'mouse') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+        <rect
+          x="29"
+          y="16"
+          width="42"
+          height="68"
+          rx="21"
+          fill="#DCE9F6"
+          stroke="#2C2623"
+          strokeWidth="3"
+        />
+        <line x1="50" y1="16" x2="50" y2="44" stroke="#2C2623" strokeWidth="2.4" />
+        <line x1="29" y1="44" x2="71" y2="44" stroke="#2C2623" strokeWidth="2.4" />
+        <rect x="46" y="25" width="8" height="14" rx="4" fill="#3E5634" stroke="#2C2623" strokeWidth="2" />
+      </svg>
+    );
+  }
+
+  if (variant === 'massager') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+        <rect x="22" y="24" width="46" height="24" rx="10" fill="#E4EFE0" stroke="#2C2623" strokeWidth="3" />
+        <rect x="68" y="30" width="8" height="12" rx="2" fill="#2C2623" />
+        <circle cx="80" cy="36" r="8" fill="#FAD6B8" stroke="#2C2623" strokeWidth="2.8" />
+        <path
+          d="M34 48L40 82C41 85 43 86 46 86H52C55 86 57 84 56 81L50 48"
+          fill="#FFFFFF"
+          stroke="#2C2623"
+          strokeWidth="3"
+          strokeLinejoin="round"
+        />
+        <circle cx="36" cy="36" r="4" fill="#3E5634" />
+      </svg>
+    );
+  }
+
+  if (variant === 'coaster') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+        <polygon
+          points="50,16 82,32 82,68 50,84 18,68 18,32"
+          fill="#FAD6B8"
+          stroke="#2C2623"
+          strokeWidth="3"
+          strokeLinejoin="round"
+        />
+        <polyline points="18,32 50,48 82,32" stroke="#2C2623" strokeWidth="2.6" strokeLinejoin="round" />
+        <line x1="50" y1="48" x2="50" y2="84" stroke="#2C2623" strokeWidth="2.6" />
+        <line x1="34" y1="24" x2="66" y2="40" stroke="#3E5634" strokeWidth="2.6" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
   if (variant === 'car') {
     return (
       <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
@@ -132,15 +278,14 @@ export const ProductIllustrationSvg: React.FC<{
 };
 
 export const PlatformBadgeSvg: React.FC<{
-  platform: 'Shopee' | 'Lazada' | 'TikTok Shop' | 'Temu';
+  platform: 'Shopee' | 'Lazada' | 'Temu';
 }> = ({ platform }) => {
   const colorMap: Record<string, { bg: string; text: string; label: string }> = {
     Shopee: { bg: '#EE4D2D', text: '#FFFFFF', label: 'S' },
     Lazada: { bg: '#0F146D', text: '#FFFFFF', label: 'L' },
-    'TikTok Shop': { bg: '#111111', text: '#FFFFFF', label: 'T' },
     Temu: { bg: '#F97316', text: '#FFFFFF', label: 'M' },
   };
-  const badge = colorMap[platform] || colorMap['TikTok Shop'];
+  const badge = colorMap[platform] || colorMap.Shopee;
 
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-ink bg-white px-2.5 py-0.5 text-xs font-semibold text-ink shadow-crisp">
@@ -387,5 +532,21 @@ export const EditIcon: React.FC<IconProps> = ({ className = '', size = 16 }) => 
 export const CheckIcon: React.FC<IconProps> = ({ className = '', size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" {...strokeProps} className={className}>
     <path d="M20 6 9 17l-5-5" />
+  </svg>
+);
+
+export const LogOutIcon: React.FC<IconProps> = ({ className = '', size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...strokeProps} className={className}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+);
+
+export const ExternalLinkIcon: React.FC<IconProps> = ({ className = '', size = 15 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" {...strokeProps} className={className}>
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    <polyline points="15 3 21 3 21 9" />
+    <line x1="10" y1="14" x2="21" y2="3" />
   </svg>
 );

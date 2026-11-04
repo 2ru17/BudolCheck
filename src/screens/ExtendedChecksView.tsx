@@ -8,15 +8,25 @@ import {
   AlertIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
+  ExternalLinkIcon,
   HeartIcon,
   PlatformBadgeSvg,
   ShareIcon,
 } from '../components/icons/SvgIcons.tsx';
+import {
+  formatCurrency,
+  resolveListingExternalUrl,
+} from '../lib/formatters.ts';
 import { Stagger, StaggerItem } from '../components/visuals/Motion.tsx';
 
 export const MarketingCheckView: React.FC = () => {
   const activeCheck = useBudolStore((s) => s.activeCheck);
   const navigateTo = useBudolStore((s) => s.navigateTo);
+  const directListingUrl = resolveListingExternalUrl(
+    activeCheck.sourceUrl,
+    activeCheck.platformName,
+    activeCheck.productTitle
+  );
 
   return (
     <div className="space-y-5">
@@ -30,14 +40,25 @@ export const MarketingCheckView: React.FC = () => {
           <span>Back to Home</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => navigateTo('redflags')}
-          className="budol-btn-primary px-4 py-2 text-xs"
-        >
-          <span>Inspect Red Flags</span>
-          <ArrowRightIcon size={15} />
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={directListingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="budol-btn-secondary px-3.5 py-2 text-xs"
+          >
+            <span>Open Listing on {activeCheck.platformName}</span>
+            <ExternalLinkIcon size={13} />
+          </a>
+          <button
+            type="button"
+            onClick={() => navigateTo('redflags')}
+            className="budol-btn-primary px-4 py-2 text-xs"
+          >
+            <span>Inspect Red Flags</span>
+            <ArrowRightIcon size={15} />
+          </button>
+        </div>
       </div>
 
       <div className="budol-card bg-butter p-5">
@@ -106,7 +127,15 @@ export const MarketingCheckView: React.FC = () => {
 
 export const BudolRedFlagsView: React.FC = () => {
   const activeCheck = useBudolStore((s) => s.activeCheck);
+  const role = useBudolStore((s) => s.role);
   const navigateTo = useBudolStore((s) => s.navigateTo);
+  const setAdminConsoleTab = useBudolStore((s) => s.setAdminConsoleTab);
+  const submitReportToAdminQueue = useBudolStore((s) => s.submitReportToAdminQueue);
+  const directListingUrl = resolveListingExternalUrl(
+    activeCheck.sourceUrl,
+    activeCheck.platformName,
+    activeCheck.productTitle
+  );
 
   return (
     <div className="space-y-5">
@@ -120,14 +149,50 @@ export const BudolRedFlagsView: React.FC = () => {
           <span>Back to Home</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => navigateTo('summary')}
-          className="budol-btn-primary px-4 py-2 text-xs"
-        >
-          <span>View Final Summary</span>
-          <ArrowRightIcon size={15} />
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={directListingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="budol-btn-secondary px-3.5 py-2 text-xs"
+          >
+            <span>Open Listing on {activeCheck.platformName}</span>
+            <ExternalLinkIcon size={13} />
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              void submitReportToAdminQueue({
+                productTitle: activeCheck.productTitle,
+                subtitle: `${activeCheck.seller.storeName} • ${activeCheck.redFlags.riskLabel}`,
+                platform: activeCheck.platformName,
+                flagReason:
+                  activeCheck.redFlags.items[0]?.title ||
+                  'Flagged from Red Flags Scanner',
+                reportCategory: 'report',
+                priceAnomaly: `${formatCurrency(activeCheck.listedPricePhp)} (${activeCheck.redFlags.riskLabel})`,
+                illustrationKey: activeCheck.illustrationKey,
+                thumbnailUrl: activeCheck.imageUrls?.[0],
+                sourceUrl: activeCheck.sourceUrl,
+              });
+              if (role === 'admin') {
+                setAdminConsoleTab('reports');
+              }
+            }}
+            className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full border-[1.5px] border-ink bg-flag px-3.5 py-2 text-xs font-bold text-white shadow-crisp"
+          >
+            <AlertIcon size={13} />
+            <span>{role === 'admin' ? 'Escalate to Queue' : 'Report Listing'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigateTo('summary')}
+            className="budol-btn-primary px-4 py-2 text-xs"
+          >
+            <span>View Final Summary</span>
+            <ArrowRightIcon size={15} />
+          </button>
+        </div>
       </div>
 
       <div className="budol-card flex flex-col justify-between gap-4 bg-blush p-5 sm:flex-row sm:items-center">
@@ -244,6 +309,20 @@ export const FinalSummaryView: React.FC = () => {
         </button>
 
         <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={resolveListingExternalUrl(
+              activeCheck.sourceUrl,
+              activeCheck.platformName,
+              activeCheck.productTitle
+            )}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="budol-btn-secondary px-3.5 py-2 text-xs"
+          >
+            <span>Visit Listing on {activeCheck.platformName}</span>
+            <ExternalLinkIcon size={14} />
+          </a>
+
           <button
             type="button"
             onClick={() => toggleSavedCheck(activeCheck.id)}

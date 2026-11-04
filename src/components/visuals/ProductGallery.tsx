@@ -22,14 +22,27 @@ interface SlideArtProps {
 }
 
 const SlideArt: React.FC<SlideArtProps> = ({ slide, illustrationKey, size, zoomed, origin }) => {
-  if (slide.imageUrl) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [slide.imageUrl]);
+
+  if (slide.imageUrl && !imageFailed) {
     return (
       <img
         src={slide.imageUrl}
         alt={slide.caption}
         draggable={false}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onError={() => setImageFailed(true)}
         className="h-full w-full object-contain transition-transform duration-200"
-        style={{ transform: zoomed ? 'scale(2.2)' : 'scale(1)', transformOrigin: origin }}
+        style={{
+          transform: `scale(${(zoomed ? 2.2 : 1) * slide.scale})`,
+          transformOrigin: origin,
+        }}
       />
     );
   }
@@ -121,9 +134,11 @@ const Lightbox: React.FC<LightboxProps> = ({
       >
         <div className="min-w-0 text-cream">
           <p className="truncate text-sm font-semibold">{title}</p>
-          <p className="text-xs tabular-nums text-cream/70">
-            {index + 1} of {slides.length} - {slide.label}
-          </p>
+          {slides.length > 1 && (
+            <p className="text-xs tabular-nums text-cream/70">
+              {index + 1} of {slides.length}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -187,15 +202,12 @@ const Lightbox: React.FC<LightboxProps> = ({
         )}
       </div>
 
-      <div
-        className="mx-auto w-full max-w-4xl pt-3"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <p className="text-balance text-center text-sm font-medium text-cream">
-          {slide.caption}
-        </p>
-        {slides.length > 1 && (
-          <div className="mt-3 flex justify-center gap-2">
+      {slides.length > 1 && (
+        <div
+          className="mx-auto w-full max-w-4xl pt-3"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex justify-center gap-2">
             {slides.map((item, itemIndex) => (
               <button
                 key={item.id}
@@ -204,7 +216,7 @@ const Lightbox: React.FC<LightboxProps> = ({
                   setZoomed(false);
                   onChange(itemIndex);
                 }}
-                aria-label={`Show ${item.label} photo`}
+                aria-label={`Show photo ${itemIndex + 1}`}
                 aria-current={itemIndex === index}
                 className={`h-14 w-14 overflow-hidden rounded-xl border-[1.5px] ${item.bgClass} ${
                   itemIndex === index ? 'border-cream' : 'border-ink opacity-70'
@@ -214,8 +226,8 @@ const Lightbox: React.FC<LightboxProps> = ({
               </button>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </motion.div>
   );
 };
@@ -225,17 +237,35 @@ interface ProductGalleryProps {
 }
 
 export const ProductGallery: React.FC<ProductGalleryProps> = ({ check }) => {
-  const slides = buildGallery(check);
+  const [extraUrls, setExtraUrls] = useState<string[]>([]);
+  const baseSlides = buildGallery(check);
+  const slides =
+    baseSlides.length < 2 && extraUrls.length > 1
+      ? buildGallery({ ...check, imageUrls: extraUrls })
+      : baseSlides;
   const [index, setIndex] = useState(0);
   const [open, setOpen] = useState(false);
   const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
     setIndex(0);
+    setExtraUrls([]);
+    if (check.uploadedImageUrl || baseSlides.length >= 2) return;
+    const controller = new AbortController();
+    const params = new URLSearchParams({ q: check.productTitle, checkId: check.id });
+    fetch(`/api/images/gallery?${params.toString()}`, { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { urls?: string[] } | null) => {
+        if (data?.urls && data.urls.length > 1) setExtraUrls(data.urls);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [check.id]);
 
   const safeIndex = Math.min(index, slides.length - 1);
   const slide = slides[safeIndex];
+  const hasRealPhoto = Boolean(slide.imageUrl);
 
   const step = (delta: number) =>
     setIndex((safeIndex + delta + slides.length) % slides.length);
@@ -264,10 +294,6 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ check }) => {
         />
         <SlideArt slide={slide} illustrationKey={check.illustrationKey} size={190} />
 
-        <span className="absolute left-3 top-3 z-20 rounded-full border border-ink bg-white px-2.5 py-0.5 text-[11px] font-semibold text-ink">
-          {slide.label}
-        </span>
-
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -295,12 +321,11 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ check }) => {
             >
               <ChevronRightIcon size={18} />
             </button>
+            <span className="absolute bottom-3 right-3 z-20 rounded-full border border-ink bg-white px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-ink">
+              {safeIndex + 1} / {slides.length}
+            </span>
           </>
         )}
-
-        <span className="absolute bottom-3 right-3 z-20 rounded-full border border-ink bg-white px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-ink">
-          {safeIndex + 1} / {slides.length}
-        </span>
       </div>
 
       {slides.length > 1 && (
@@ -310,7 +335,7 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ check }) => {
               key={item.id}
               type="button"
               onClick={() => setIndex(itemIndex)}
-              aria-label={`Show ${item.label} photo`}
+              aria-label={`Show photo ${itemIndex + 1}`}
               aria-current={itemIndex === safeIndex}
               className={`flex aspect-square min-h-[44px] items-center justify-center overflow-hidden rounded-xl border-[1.5px] transition-shadow ${item.bgClass} ${
                 itemIndex === safeIndex
@@ -325,8 +350,9 @@ export const ProductGallery: React.FC<ProductGalleryProps> = ({ check }) => {
       )}
 
       <p className="text-pretty text-xs font-normal leading-relaxed text-ink-muted">
-        {slide.caption}. Tap the photo to enlarge.
-        {!check.uploadedImageUrl && ' Preview illustrations stand in for listing photos until live import is connected.'}
+        {hasRealPhoto
+          ? 'Tap photo to inspect full screen.'
+          : `Direct marketplace photo preview unavailable. Use Open on ${check.platformName} to view live seller photos.`}
       </p>
 
       {createPortal(

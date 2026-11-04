@@ -1,7 +1,7 @@
-import React, { memo, useRef, useState } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import { useDebouncedValue } from '@mantine/hooks';
-import { useBudolStore } from '../store/useBudolStore.ts';
-import { ScreenId } from '../types/budol.ts';
+import { useBudolStore, SearchPlatformFilter } from '../store/useBudolStore.ts';
+import { MarketplaceSearchItem, ScreenId } from '../types/budol.ts';
 import { ShaderHeroBanner } from '../components/visuals/ShaderHeroBanner.tsx';
 import {
   AlertIcon,
@@ -12,6 +12,7 @@ import {
   ClipboardIcon,
   CloseIcon,
   EditIcon,
+  ExternalLinkIcon,
   HeartIcon,
   PlatformBadgeSvg,
   ProductIllustrationSvg,
@@ -20,15 +21,20 @@ import {
   StarIcon,
   TagIcon,
   UploadIcon,
+  UserIcon,
 } from '../components/icons/SvgIcons.tsx';
-import { formatCurrency } from '../lib/formatters.ts';
+import {
+  formatCurrency,
+  resolveListingExternalUrl,
+} from '../lib/formatters.ts';
+import { resolveCleanProductImageUrl } from '../lib/productContent.ts';
 import { Reveal, Stagger, StaggerItem } from '../components/visuals/Motion.tsx';
 
 const HOW_IT_WORKS = [
   {
     step: '01',
-    title: 'Paste the product link',
-    body: 'Drop a listing URL or upload a screenshot from Shopee, Lazada, TikTok Shop, or Temu.',
+    title: 'Search across stores or paste a link',
+    body: 'Compare multiple real listings across Shopee, Lazada, and Temu, or drop a direct product URL.',
     tint: 'bg-peach',
   },
   {
@@ -44,6 +50,155 @@ const HOW_IT_WORKS = [
     tint: 'bg-butter',
   },
 ];
+
+const QUICK_SEARCH_KEYWORDS = [
+  'ergonomic mouse',
+  'smartwatch',
+  'massage gun',
+  'golf umbrella',
+  'wireless earbuds',
+];
+
+const PLATFORM_FILTER_TABS: Array<{ id: SearchPlatformFilter; label: string }> = [
+  { id: 'all', label: 'All Stores' },
+  { id: 'Shopee', label: 'Shopee' },
+  { id: 'Lazada', label: 'Lazada' },
+  { id: 'Temu', label: 'Temu' },
+];
+
+const CatalogResultCard = memo<{
+  item: MarketplaceSearchItem;
+  isChecking: boolean;
+  onSelectForCheck: (catalogId: string) => void;
+}>(({ item, isChecking, onSelectForCheck }) => {
+  const [imgFailed, setImgFailed] = useState(false);
+  const resolvedImageUrl = resolveCleanProductImageUrl(
+    item.imageUrl,
+    `${item.brandName} ${item.productTitle}`,
+    item.platformName === 'Shopee' ? 0 : item.platformName === 'Lazada' ? 1 : 2
+  );
+  const hasDiscount = Boolean(
+    item.originalPricePhp && item.originalPricePhp > item.pricePhp
+  );
+  const discountPct = hasDiscount
+    ? Math.round((1 - item.pricePhp / (item.originalPricePhp as number)) * 100)
+    : 0;
+
+  return (
+    <article
+      data-testid={`search-result-card-${item.id}`}
+      className="budol-card flex h-full flex-col justify-between bg-white p-4"
+    >
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-1.5">
+          <PlatformBadgeSvg platform={item.platformName} />
+          {item.isMallVerified ? (
+            <span className="sticker bg-mint text-verified">Official Mall</span>
+          ) : (
+            <span className="sticker bg-cream text-ink-muted">{item.sellerLocation}</span>
+          )}
+        </div>
+
+        <div className="mt-3 flex items-start gap-3">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border-[1.5px] border-ink bg-white shadow-crisp">
+            {resolvedImageUrl && !imgFailed ? (
+              <img
+                src={resolvedImageUrl}
+                alt={item.productTitle}
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+                onError={() => setImgFailed(true)}
+                className="h-full w-full bg-white object-contain p-1"
+              />
+            ) : (
+              <ProductIllustrationSvg variant={item.illustrationKey} size={52} />
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <h3 className="line-clamp-2 text-sm font-bold leading-snug text-ink">
+              {item.productTitle}
+            </h3>
+            <p className="mt-1 truncate text-xs font-medium text-ink-muted">
+              {item.sellerName}
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs tabular-nums text-ink">
+              <span className="inline-flex items-center gap-1 font-semibold">
+                <StarIcon size={12} filled />
+                {item.starRating.toFixed(1)}
+              </span>
+              <span className="text-ink-muted">
+                ({item.reviewCount.toLocaleString()})
+              </span>
+              {item.soldCountText && (
+                <span className="text-ink-muted">{item.soldCountText}</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-baseline gap-2 rounded-xl border border-ink/20 bg-cream/70 px-3 py-2">
+          <span className="text-lg font-bold tabular-nums text-flag">
+            {formatCurrency(item.pricePhp)}
+          </span>
+          {hasDiscount && (
+            <>
+              <span className="text-xs tabular-nums text-ink-muted line-through">
+                {formatCurrency(item.originalPricePhp as number)}
+              </span>
+              <span className="rounded-full border border-ink bg-flag px-2 py-0.5 text-[10px] font-bold tabular-nums text-white">
+                -{discountPct}%
+              </span>
+            </>
+          )}
+        </div>
+
+        {item.variants.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap gap-1">
+            {item.variants.slice(0, 3).map((v) => (
+              <span
+                key={v}
+                className="rounded-full border border-ink/25 bg-white px-2 py-0.5 text-[11px] font-medium text-ink-muted"
+              >
+                {v}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-ink/15 pt-3">
+        <button
+          type="button"
+          disabled={isChecking}
+          onClick={() => onSelectForCheck(item.id)}
+          className="budol-btn-primary !min-h-[40px] flex-1 !px-3 text-xs"
+        >
+          <span>Run 6-Point Check</span>
+          <ArrowRightIcon size={14} />
+        </button>
+
+        <a
+          href={resolveListingExternalUrl(
+            item.sourceUrl,
+            item.platformName,
+            item.productTitle
+          )}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="budol-btn-secondary !min-h-[40px] !px-3 text-xs"
+          aria-label={`Open ${item.productTitle} on ${item.platformName}`}
+        >
+          <span>Open on {item.platformName}</span>
+          <ExternalLinkIcon size={13} />
+        </a>
+      </div>
+    </article>
+  );
+});
+
+CatalogResultCard.displayName = 'CatalogResultCard';
 
 interface BentoCardProps {
   title: string;
@@ -111,12 +266,29 @@ const BentoModuleCard = memo<BentoCardProps>(
 BentoModuleCard.displayName = 'BentoModuleCard';
 
 export const HomeDashboardView: React.FC = () => {
+  const isAuthenticated = useBudolStore((s) => s.isAuthenticated);
+  const role = useBudolStore((s) => s.role);
   const userName = useBudolStore((s) => s.userName);
+  const userEmail = useBudolStore((s) => s.userEmail);
   const activeCheck = useBudolStore((s) => s.activeCheck);
   const historyChecks = useBudolStore((s) => s.historyChecks);
   const isLoadingCheck = useBudolStore((s) => s.isLoadingCheck);
+  const searchResults = useBudolStore((s) => s.searchResults);
+  const searchQuery = useBudolStore((s) => s.searchQuery);
+  const searchPlatformFilter = useBudolStore((s) => s.searchPlatformFilter);
+  const isSearchingCatalog = useBudolStore((s) => s.isSearchingCatalog);
+
   const navigateTo = useBudolStore((s) => s.navigateTo);
+  const setSellerPortalTab = useBudolStore((s) => s.setSellerPortalTab);
+  const setAdminConsoleTab = useBudolStore((s) => s.setAdminConsoleTab);
+  const submitReportToAdminQueue = useBudolStore((s) => s.submitReportToAdminQueue);
   const runLinkAnalysis = useBudolStore((s) => s.runLinkAnalysis);
+  const runKeywordSearch = useBudolStore((s) => s.runKeywordSearch);
+  const setSearchPlatformFilter = useBudolStore((s) => s.setSearchPlatformFilter);
+  const clearSearchResults = useBudolStore((s) => s.clearSearchResults);
+  const selectCatalogListingForCheck = useBudolStore(
+    (s) => s.selectCatalogListingForCheck
+  );
   const loadProductCheck = useBudolStore((s) => s.loadProductCheck);
   const showToast = useBudolStore((s) => s.showToast);
   const hasListing = useBudolStore((s) => s.hasListing);
@@ -126,28 +298,35 @@ export const HomeDashboardView: React.FC = () => {
   const clearListing = useBudolStore((s) => s.clearListing);
   const toggleSavedCheck = useBudolStore((s) => s.toggleSavedCheck);
   const isSaved = useBudolStore((s) => s.savedCheckIds.includes(s.activeCheck.id));
-  const userEmail = useBudolStore((s) => s.userEmail);
   const updateUserProfile = useBudolStore((s) => s.updateUserProfile);
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(userName);
+  const [heroImgFailed, setHeroImgFailed] = useState(false);
 
-  const [inputQuery, setInputQuery] = useState(activeCheck.sourceUrl);
-  const [debouncedQuery] = useDebouncedValue(inputQuery, 300);
+  const [inputQuery, setInputQuery] = useState(searchQuery);
+  const [debouncedInputQuery] = useDebouncedValue(inputQuery, 300);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const filteredQuickChecks = historyChecks.filter((item) => {
-    const q = debouncedQuery.trim().toLowerCase();
-    if (!q || q.startsWith('http')) return true;
-    return (
-      item.productTitle.toLowerCase().includes(q) ||
-      item.platformName.toLowerCase().includes(q)
-    );
-  });
+  useEffect(() => {
+    setHeroImgFailed(false);
+  }, [activeCheck.id]);
+
+  useEffect(() => {
+    const trimmed = debouncedInputQuery.trim();
+    if (
+      searchResults &&
+      trimmed.length >= 3 &&
+      !/^https?:\/\//i.test(trimmed) &&
+      trimmed.toLowerCase() !== searchResults.query.toLowerCase()
+    ) {
+      void runKeywordSearch(trimmed, searchPlatformFilter);
+    }
+  }, [debouncedInputQuery, runKeywordSearch, searchPlatformFilter, searchResults]);
 
   const handleAnalyzeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await runLinkAnalysis(inputQuery || activeCheck.sourceUrl);
+    await runLinkAnalysis(inputQuery);
   };
 
   const handlePasteClipboard = async () => {
@@ -170,6 +349,8 @@ export const HomeDashboardView: React.FC = () => {
   const handleInputPaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
     const pasted = e.clipboardData.getData('text').trim();
     if (!pasted) return;
+    const isDirectUrl = /^https?:\/\//i.test(pasted);
+    if (!isDirectUrl) return;
     e.preventDefault();
     setInputQuery(pasted);
     await runLinkAnalysis(pasted);
@@ -196,15 +377,34 @@ export const HomeDashboardView: React.FC = () => {
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
-        setInputQuery('');
-        void runImageAnalysis(reader.result, file.name);
+        const rawDataUrl = reader.result;
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 960;
+          const scale = Math.min(1, maxDim / Math.max(img.width || 1, img.height || 1));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          const ctx = canvas.getContext('2d');
+          const compressedUrl = ctx
+            ? (ctx.drawImage(img, 0, 0, canvas.width, canvas.height),
+              canvas.toDataURL('image/jpeg', 0.78))
+            : rawDataUrl;
+          setInputQuery('');
+          void runImageAnalysis(compressedUrl, file.name);
+        };
+        img.onerror = () => {
+          setInputQuery('');
+          void runImageAnalysis(rawDataUrl, file.name);
+        };
+        img.src = rawDataUrl;
       }
     };
     reader.readAsDataURL(file);
   };
 
-  const handleSaveName = () => {
-    updateUserProfile(nameDraft, userEmail);
+  const handleSaveName = async () => {
+    await updateUserProfile(nameDraft, userEmail);
     setIsEditingName(false);
   };
 
@@ -283,46 +483,134 @@ export const HomeDashboardView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <ShaderHeroBanner userName={userName} onClick={() => navigateTo('tips')} />
+      <ShaderHeroBanner
+        userName={isAuthenticated ? userName : 'Smart Shopper'}
+        onClick={() => navigateTo('tips')}
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-        {isEditingName ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSaveName();
-            }}
-            className="flex items-center gap-2"
-          >
-            <input
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              aria-label="Your name"
-              maxLength={24}
-              autoFocus
-              className="min-h-[44px] w-40 rounded-full border-[1.5px] border-ink bg-white px-4 text-sm font-semibold text-ink focus:outline-none"
-            />
-            <button type="submit" aria-label="Save name" className="budol-btn-primary !min-h-[44px] !px-3.5 text-xs">
-              <CheckIcon size={14} />
+        {isAuthenticated ? (
+          isEditingName ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSaveName();
+              }}
+              className="flex items-center gap-2"
+            >
+              <input
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                aria-label="Your name"
+                maxLength={40}
+                autoFocus
+                className="min-h-[44px] w-48 rounded-full border-[1.5px] border-ink bg-white px-4 text-sm font-semibold text-ink focus:outline-none"
+              />
+              <button
+                type="submit"
+                aria-label="Save name"
+                className="budol-btn-primary !min-h-[44px] !px-3.5 text-xs"
+              >
+                <CheckIcon size={14} />
+              </button>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setNameDraft(userName);
+                setIsEditingName(true);
+              }}
+              className="inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold text-ink"
+            >
+              <span>Shopping as {userName}</span>
+              <EditIcon size={14} className="text-ink-muted" />
             </button>
-          </form>
+          )
         ) : (
-          <button
-            type="button"
-            onClick={() => {
-              setNameDraft(userName);
-              setIsEditingName(true);
-            }}
-            className="inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold text-ink"
-          >
-            <span>Shopping as {userName}</span>
-            <EditIcon size={14} className="text-ink-muted" />
-          </button>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-semibold text-ink">Browsing as Guest</span>
+            <button
+              type="button"
+              onClick={() => navigateTo('auth')}
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-ink/30 bg-white px-3 py-1 text-xs font-semibold text-forest hover:border-ink hover:bg-peach/40"
+            >
+              <UserIcon size={13} />
+              <span>Log in to sync saved checks</span>
+            </button>
+          </div>
         )}
         <span className="text-xs font-medium text-ink-muted">
-          Tip: pasting a link starts the check automatically
+          Search any product across Shopee, Lazada, and Temu or paste a direct product URL
         </span>
       </div>
+
+      {isAuthenticated && role === 'admin' && (
+        <div className="budol-card flex flex-wrap items-center justify-between gap-3 bg-blush/50 px-4 py-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-ink">
+            <ShieldIcon size={15} className="text-flag" />
+            <span>Moderator Inspector Mode: Inspecting live marketplace listings</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                void submitReportToAdminQueue({
+                  productTitle: activeCheck.productTitle,
+                  subtitle: `${activeCheck.seller.storeName} • ${activeCheck.redFlags.riskLabel}`,
+                  platform: activeCheck.platformName,
+                  flagReason:
+                    activeCheck.redFlags.items[0]?.title ||
+                    'Flagged by Moderator from Inspector',
+                  reportCategory: 'report',
+                  priceAnomaly: `${formatCurrency(activeCheck.listedPricePhp)} (${activeCheck.redFlags.riskLabel})`,
+                  illustrationKey: activeCheck.illustrationKey,
+                  thumbnailUrl: activeCheck.imageUrls?.[0],
+                  sourceUrl: activeCheck.sourceUrl,
+                });
+              }}
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border-[1.5px] border-ink bg-flag px-3.5 py-1 text-xs font-bold text-white shadow-crisp"
+            >
+              <AlertIcon size={13} />
+              <span>Flag Active Listing to Queue</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdminConsoleTab('reports')}
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border-[1.5px] border-ink bg-white px-3.5 py-1 text-xs font-semibold text-ink shadow-crisp hover:bg-cream"
+            >
+              <span>Open Moderation Queue</span>
+              <ArrowRightIcon size={13} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isAuthenticated && role === 'seller' && (
+        <div className="budol-card flex flex-wrap items-center justify-between gap-3 bg-mint/60 px-4 py-3">
+          <div className="flex items-center gap-2 text-xs font-bold text-ink">
+            <ShieldIcon size={15} className="text-forest" />
+            <span>Merchant Inspector Mode: Benchmark competitor listings &amp; audit specs</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSellerPortalTab('guidelines')}
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border-[1.5px] border-ink bg-forest px-3.5 py-1 text-xs font-bold text-white shadow-crisp"
+            >
+              <span>Run Seller Self-Audit</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSellerPortalTab('products')}
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border-[1.5px] border-ink bg-white px-3.5 py-1 text-xs font-semibold text-ink shadow-crisp hover:bg-cream"
+            >
+              <span>Manage My Products</span>
+              <ArrowRightIcon size={13} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="budol-card-elevated bg-white">
         <form onSubmit={handleAnalyzeSubmit} className="space-y-3">
@@ -340,7 +628,7 @@ export const HomeDashboardView: React.FC = () => {
                   if (linkError) dismissLinkError();
                 }}
                 onPaste={handleInputPaste}
-                placeholder="Paste a link from Shopee, Lazada, TikTok, Instagram, Facebook, YouTube, Pinterest or X"
+                placeholder="Search a product across stores (e.g. ergonomic mouse, smartwatch) or paste a listing link"
                 aria-label="Paste product link or search product"
                 className="min-h-[44px] w-full rounded-full border-[1.5px] border-ink bg-cream py-2.5 pl-11 pr-11 text-sm font-medium text-ink placeholder:text-ink-muted focus:bg-white focus:outline-none"
               />
@@ -351,7 +639,7 @@ export const HomeDashboardView: React.FC = () => {
                     setInputQuery('');
                     dismissLinkError();
                   }}
-                  aria-label="Clear link"
+                  aria-label="Clear search or link"
                   className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-ink-muted hover:bg-peach/60 hover:text-ink"
                 >
                   <CloseIcon size={15} />
@@ -389,10 +677,16 @@ export const HomeDashboardView: React.FC = () => {
 
               <button
                 type="submit"
-                disabled={isLoadingCheck}
+                disabled={isLoadingCheck || isSearchingCatalog}
                 className="budol-btn-primary col-span-2 text-xs sm:col-span-1"
               >
-                <span>{isLoadingCheck ? 'Checking...' : 'Check Now'}</span>
+                <span>
+                  {isSearchingCatalog
+                    ? 'Searching...'
+                    : isLoadingCheck
+                    ? 'Checking...'
+                    : 'Search / Check'}
+                </span>
                 <ArrowRightIcon size={15} />
               </button>
             </div>
@@ -408,7 +702,7 @@ export const HomeDashboardView: React.FC = () => {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-ink">{linkError}</p>
                   <p className="mt-0.5 text-xs font-normal text-ink-muted">
-                    Upload a screenshot or photo of the product and we will build a limited check from it.
+                    Paste a valid Shopee, Lazada, Temu, or social URL, search by product keyword, or upload a screenshot.
                   </p>
                   <div className="mt-2.5 flex flex-wrap gap-2">
                     <button
@@ -433,15 +727,41 @@ export const HomeDashboardView: React.FC = () => {
           )}
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <span className="section-label mr-1">Sample Checks:</span>
-            {filteredQuickChecks.map((item) => {
-              const isSelected = item.id === activeCheck.id;
+            <span className="section-label mr-1">Compare Across Stores:</span>
+            {QUICK_SEARCH_KEYWORDS.map((kw) => {
+              const active =
+                searchResults?.query.toLowerCase() === kw.toLowerCase();
+              return (
+                <button
+                  key={kw}
+                  type="button"
+                  onClick={() => {
+                    setInputQuery(kw);
+                    void runKeywordSearch(kw, 'all');
+                  }}
+                  className={`sticker cursor-pointer transition-transform duration-150 hover:-translate-y-0.5 ${
+                    active
+                      ? 'bg-forest text-white'
+                      : 'bg-butter/70 text-ink hover:bg-peach'
+                  }`}
+                >
+                  <SearchIcon size={11} />
+                  <span>{kw}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-ink/10 pt-2.5">
+            <span className="section-label mr-1">Recent Reports:</span>
+            {historyChecks.slice(0, 4).map((item) => {
+              const isSelected = item.id === activeCheck.id && !searchResults;
               return (
                 <button
                   key={item.id}
                   type="button"
                   onClick={async () => {
-                    setInputQuery(item.sourceUrl);
+                    clearSearchResults();
                     await loadProductCheck(item.id);
                   }}
                   className={`sticker cursor-pointer transition-transform duration-150 hover:-translate-y-0.5 ${
@@ -458,6 +778,116 @@ export const HomeDashboardView: React.FC = () => {
         </form>
       </div>
 
+      {(searchResults || isSearchingCatalog) && (
+        <section
+          aria-label="Multi-store marketplace search results"
+          data-testid="marketplace-search-results"
+          className="budol-card-elevated space-y-4 bg-white"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-ink/15 pb-3.5">
+            <div>
+              <span className="section-label">Multi-Store Marketplace Search</span>
+              <h2 className="font-editorial mt-1 text-2xl font-bold text-ink">
+                {isSearchingCatalog
+                  ? `Searching online stores for "${searchQuery}"...`
+                  : `Listings for "${searchResults?.query ?? searchQuery}" (${searchResults?.total ?? 0})`}
+              </h2>
+              <p className="mt-0.5 text-xs text-ink-muted">
+                Compare listings across Shopee, Lazada, and Temu. Run a 6-point check on any listing or open the live store search directly.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                clearSearchResults();
+                setInputQuery('');
+              }}
+              className="budol-btn-secondary !min-h-[40px] !px-3.5 text-xs"
+            >
+              <CloseIcon size={14} />
+              <span>Close Search</span>
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div
+              role="tablist"
+              aria-label="Filter results by store"
+              className="flex flex-wrap items-center gap-1.5"
+            >
+              {PLATFORM_FILTER_TABS.map((tab) => {
+                const active = searchPlatformFilter === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => void setSearchPlatformFilter(tab.id)}
+                    className={`min-h-[40px] rounded-full border-[1.5px] border-ink px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                      active
+                        ? 'bg-olive text-white shadow-crisp'
+                        : 'bg-cream text-ink hover:bg-peach'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {searchResults?.storeSearchLinks && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+                  Live Store Search:
+                </span>
+                {searchResults.storeSearchLinks
+                  .filter((link) => !link.platform.toLowerCase().includes('tiktok'))
+                  .map((link) => (
+                    <a
+                      key={link.platform}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex min-h-[38px] items-center gap-1 rounded-full border-[1.5px] border-ink bg-butter/80 px-3 py-1 text-xs font-semibold text-ink shadow-crisp transition-transform hover:-translate-y-0.5"
+                    >
+                      <span>{link.platform}</span>
+                      <ExternalLinkIcon size={12} />
+                    </a>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          {searchResults && searchResults.items.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {searchResults.items.map((item) => (
+                <CatalogResultCard
+                  key={item.id}
+                  item={item}
+                  isChecking={isLoadingCheck}
+                  onSelectForCheck={(catalogId) =>
+                    void selectCatalogListingForCheck(catalogId)
+                  }
+                />
+              ))}
+            </div>
+          ) : (
+            !isSearchingCatalog && (
+              <div className="rounded-2xl border-[1.5px] border-dashed border-ink/35 bg-cream p-6 text-center">
+                <h3 className="font-editorial text-lg font-bold text-ink">
+                  No listings found for "{searchResults?.query}"
+                </h3>
+                <p className="mx-auto mt-1 max-w-xl text-xs leading-relaxed text-ink-muted">
+                  Try another product keyword or switch the store filter tab to All Stores to compare listings across Shopee, Lazada, and Temu.
+                </p>
+              </div>
+            )
+          )}
+        </section>
+      )}
+
       {!hasListing && (
         <div className="budol-card bg-white p-8 text-center" data-testid="ready-state">
           <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border-[1.5px] border-ink bg-mint shadow-crisp">
@@ -467,7 +897,7 @@ export const HomeDashboardView: React.FC = () => {
             Ready to check a product
           </h2>
           <p className="mx-auto mt-1 max-w-md text-pretty text-sm font-normal text-ink-muted">
-            Paste a link from Shopee, Lazada, TikTok, Instagram, Facebook, YouTube, Pinterest or X, or upload a screenshot, and your 6-point check starts right away.
+            Paste a link from Shopee, Lazada, Temu, Instagram, Facebook, YouTube, Pinterest or X, search any product keyword, or upload a screenshot, and your 6-point check starts right away.
           </p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <button type="button" onClick={handlePasteClipboard} className="budol-btn-primary text-xs">
@@ -524,10 +954,14 @@ export const HomeDashboardView: React.FC = () => {
                   aria-label="Open product photos"
                   className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-[1.5px] border-ink bg-peach shadow-crisp"
                 >
-                  {activeCheck.uploadedImageUrl ? (
+                  {(activeCheck.uploadedImageUrl || activeCheck.imageUrls?.[0]) && !heroImgFailed ? (
                     <img
-                      src={activeCheck.uploadedImageUrl}
+                      src={activeCheck.uploadedImageUrl || activeCheck.imageUrls?.[0]}
                       alt={activeCheck.productTitle}
+                      loading="lazy"
+                      decoding="async"
+                      referrerPolicy="no-referrer"
+                      onError={() => setHeroImgFailed(true)}
                       className="h-full w-full object-cover"
                     />
                   ) : (
@@ -537,14 +971,21 @@ export const HomeDashboardView: React.FC = () => {
                     />
                   )}
                 </button>
-                <div>
-                  <h2 className="font-editorial text-xl font-bold text-ink">
+                <div className="min-w-0">
+                  <h2 className="font-editorial line-clamp-2 text-xl font-bold text-ink">
                     {activeCheck.productTitle}
                   </h2>
-                  <p className="mt-0.5 text-lg font-bold tabular-nums text-flag">
-                    {formatCurrency(activeCheck.listedPricePhp)}
-                  </p>
-                  <p className="mt-0.5 text-xs font-medium text-ink-muted">
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                    <p className="text-lg font-bold tabular-nums text-flag">
+                      {formatCurrency(activeCheck.listedPricePhp)}
+                    </p>
+                    {activeCheck.isPriceEstimated && (
+                      <span className="sticker bg-butter text-ink">
+                        Benchmark Est.
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 truncate text-xs font-medium text-ink-muted">
                     Seller: {activeCheck.seller.storeName}
                   </p>
                 </div>
@@ -579,6 +1020,19 @@ export const HomeDashboardView: React.FC = () => {
               >
                 <span>Compare Prices</span>
               </button>
+              <a
+                href={resolveListingExternalUrl(
+                  activeCheck.sourceUrl,
+                  activeCheck.platformName,
+                  activeCheck.productTitle
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="budol-btn-secondary text-xs"
+              >
+                <span>Visit Store on {activeCheck.platformName}</span>
+                <ExternalLinkIcon size={13} />
+              </a>
             </div>
           </div>
         </Reveal>

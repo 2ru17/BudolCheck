@@ -1,7 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { useBudolStore } from '../store/useBudolStore.ts';
-import { UserRole } from '../types/budol.ts';
-import { ArrowRightIcon } from '../components/icons/SvgIcons.tsx';
+import { ArrowRightIcon, UserIcon } from '../components/icons/SvgIcons.tsx';
 import { MascotCanvasSkeleton } from '../components/visuals/BudolSkeletons.tsx';
 
 const ThreeShoppingBag = lazy(
@@ -9,19 +8,7 @@ const ThreeShoppingBag = lazy(
 );
 
 export const OnboardingView: React.FC = () => {
-  const role = useBudolStore((s) => s.role);
-  const setRole = useBudolStore((s) => s.setRole);
   const navigateTo = useBudolStore((s) => s.navigateTo);
-
-  const handleGetStarted = () => {
-    if (role === 'seller') {
-      navigateTo('seller-dash');
-    } else if (role === 'admin') {
-      navigateTo('admin-dash');
-    } else {
-      navigateTo('auth');
-    }
-  };
 
   return (
     <section className="mx-auto flex min-h-[82dvh] max-w-lg flex-col items-center justify-between py-6 text-center">
@@ -42,47 +29,28 @@ export const OnboardingView: React.FC = () => {
         </p>
 
         <p className="mt-3.5 max-w-md text-xs leading-relaxed text-ink-muted md:text-sm">
-          Your structured pre-purchase verification companion. Inspect product
-          claims, seller credentials, buyer unboxing photos, and cross-platform
-          prices across Shopee, Lazada, TikTok Shop, and Temu before checking out.
+          Your structured pre-purchase verification companion. Search products across
+          Shopee, Lazada, and Temu or paste a direct listing link to check
+          seller credentials, buyer photos, and real cross-store prices.
         </p>
 
-        <div className="mt-6">
-          <span className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
-            Select Active Role View
-          </span>
-          <div className="inline-flex items-center gap-1 rounded-full border-[1.5px] border-ink bg-cream p-1 shadow-crisp">
-            {(
-              [
-                { id: 'user', label: 'Shopper View' },
-                { id: 'seller', label: 'Seller View' },
-                { id: 'admin', label: 'Admin View' },
-              ] as { id: UserRole; label: string }[]
-            ).map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setRole(item.id, false)}
-                className={`min-h-[36px] rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150 ${
-                  role === item.id
-                    ? 'bg-forest text-white shadow-sm'
-                    : 'text-ink hover:bg-white'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-7 w-full max-w-sm">
+        <div className="mt-7 flex w-full max-w-sm flex-col gap-2.5">
           <button
             type="button"
-            onClick={handleGetStarted}
+            onClick={() => navigateTo('home')}
             className="btn-primary-gradient w-full py-3 text-base"
           >
-            <span>Get started</span>
+            <span>Start Checking Products</span>
             <ArrowRightIcon size={17} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigateTo('auth')}
+            className="budol-btn-secondary w-full py-2.5 text-xs"
+          >
+            <UserIcon size={15} />
+            <span>Log In or Create Account</span>
           </button>
         </div>
       </div>
